@@ -3,31 +3,19 @@
 function parseDateFlexible(raw) {
   if (!raw && raw !== 0) return null;
   if (typeof raw === "number") {
-    // epoch seconds?
     if (raw > 1e12) return new Date(raw); // ms
-    return new Date(raw * 1000);
+    return new Date(raw * 1000); // sec
   }
-  // Strings
   const s = String(raw).trim();
-  // Try ISO
   const d = new Date(s);
   if (!isNaN(d)) return d;
-  // Heuristics for strings like "Streamed 2 weeks ago" -> treat as null (unknown)
   return null;
 }
-
-function textShort(s, n=80) {
-  s = s || "";
-  return s.length > n ? s.slice(0,n-1) + "…" : s;
-}
-
-function sum(arr) { return arr.reduce((a,b)=>a+b,0); }
+function textShort(s, n = 100) { s = s || ""; return s.length > n ? s.slice(0, n - 1) + "…" : s; }
 
 // ========= Normalization per platform =========
 function normalizeAll() {
   const out = [];
-
-  // Instagram
   for (const it of (DATA.instagram || [])) {
     out.push({
       platform: "Instagram",
@@ -40,15 +28,12 @@ function normalizeAll() {
       views: Number(it.videoViewCount || it.videoPlayCount || 0),
     });
   }
-
-  // YouTube
   for (const it of (DATA.youtube || [])) {
-    // try craft URL from id
     const url = it.id ? `https://www.youtube.com/watch?v=${it.id}` : null;
     out.push({
       platform: "YouTube",
       text: it.title || it.description || "",
-      date: parseDateFlexible(it.date), // may be null if relative text
+      date: parseDateFlexible(it.date),
       url,
       likes: Number(it.likeCount || 0),
       comments: Number(it.commentCount || 0),
@@ -56,8 +41,6 @@ function normalizeAll() {
       views: Number(it.viewCount || 0),
     });
   }
-
-  // Facebook
   for (const it of (DATA.facebook || [])) {
     out.push({
       platform: "Facebook",
@@ -70,8 +53,6 @@ function normalizeAll() {
       views: Number(it.viewCount || 0),
     });
   }
-
-  // TikTok
   for (const it of (DATA.tiktok || [])) {
     const dateCandidate = it.createTimeISO || it.createTime;
     out.push({
@@ -85,8 +66,6 @@ function normalizeAll() {
       views: Number(it.playCount || 0),
     });
   }
-
-  // Twitter / X
   for (const it of (DATA.twitter || [])) {
     out.push({
       platform: "Twitter",
@@ -99,161 +78,211 @@ function normalizeAll() {
       views: Number(it.view_count || 0),
     });
   }
-
   return out;
 }
 
-// ========= State & UI =========
+// ========= State =========
+const ALL_PLATFORMS = ["Instagram", "YouTube", "Facebook", "TikTok", "Twitter"];
 const STATE = {
   all: [],
   filtered: [],
-  range: "all", // all | d7 | d30 | d90 | y2024
+  includedPlatforms: new Set(ALL_PLATFORMS),
+  range: "all",
+  sortBy: "engagement_desc"
 };
 
-function applyFilter() {
+function inDateRange(d, range) {
+  if (!d) return false;
   const now = new Date();
   const start = new Date(now);
-  let predicate = () => true;
-
-  switch (STATE.range) {
-    case "d7":
-      start.setDate(now.getDate() - 7);
-      predicate = (d) => d && d >= start && d <= now;
-      break;
-    case "d30":
-      start.setDate(now.getDate() - 30);
-      predicate = (d) => d && d >= start && d <= now;
-      break;
-    case "d90":
-      start.setDate(now.getDate() - 90);
-      predicate = (d) => d && d >= start && d <= now;
-      break;
-    case "y2024":
-      predicate = (d) => d && d.getFullYear() === 2024;
-      break;
-    default:
-      predicate = () => true;
-  }
-
-  STATE.filtered = STATE.all.filter(x => predicate(x.date));
+  if (range === "d7") { start.setDate(now.getDate() - 7); return d >= start && d <= now; }
+  if (range === "d30") { start.setDate(now.getDate() - 30); return d >= start && d <= now; }
+  if (range === "d90") { start.setDate(now.getDate() - 90); return d >= start && d <= now; }
+  if (range === "y2024") { return d.getFullYear() === 2024; }
+  return true;
 }
 
-function computeSummaries(rows) {
-  const byPlatform = {};
+function applyFilter() {
+  STATE.filtered = STATE.all.filter(x =>
+    STATE.includedPlatforms.has(x.platform) && inDateRange(x.date, STATE.range)
+  );
+}
+
+function computeByPlatform(rows) {
+  const by = {};
   for (const r of rows) {
-    const key = r.platform;
-    if (!byPlatform[key]) {
-      byPlatform[key] = { posts: 0, likes:0, comments:0, shares:0, views:0 };
-    }
-    const p = byPlatform[key];
+    const k = r.platform;
+    if (!by[k]) by[k] = { posts: 0, likes: 0, comments: 0, shares: 0, views: 0 };
+    const p = by[k];
     p.posts += 1;
     p.likes += r.likes;
     p.comments += r.comments;
     p.shares += r.shares;
     p.views += r.views;
   }
-  // derive engagement
-  for (const k in byPlatform) {
-    byPlatform[k].engagement = byPlatform[k].likes + byPlatform[k].comments + byPlatform[k].shares + byPlatform[k].views;
+  for (const k in by) {
+    by[k].engagement = by[k].likes + by[k].comments + by[k].shares + by[k].views;
   }
-  return byPlatform;
+  return by;
 }
 
-function renderCards(byPlatform) {
-  const container = document.getElementById("cards");
-  container.innerHTML = "";
-  const platforms = Object.keys(byPlatform);
-  if (platforms.length === 0) {
-    container.innerHTML = `<div class="text-gray-500">No data for selected range.</div>`;
-    return;
-  }
-  for (const k of platforms) {
-    const v = byPlatform[k];
-    const html = `
-      <div class="p-4 bg-white/70 dark:bg-slate-800 rounded-2xl shadow">
-        <div class="text-sm text-gray-500">${k}</div>
-        <div class="mt-1 text-2xl font-semibold">${v.posts.toLocaleString()} пост</div>
-        <div class="mt-2 text-xs text-gray-500">Engagement: ${v.engagement.toLocaleString()}</div>
-        <div class="mt-1 text-xs text-gray-500">👍 ${v.likes.toLocaleString()} · 💬 ${v.comments.toLocaleString()} · 🔁 ${v.shares.toLocaleString()} · ▶️ ${v.views.toLocaleString()}</div>
-      </div>`;
-    const el = document.createElement("div");
-    el.className = "min-w-[220px]";
-    el.innerHTML = html;
-    container.appendChild(el);
+function renderPlatformPills() {
+  const wrap = document.getElementById("platformFilters");
+  wrap.innerHTML = "";
+  for (const p of ALL_PLATFORMS) {
+    const on = STATE.includedPlatforms.has(p);
+    const btn = document.createElement("button");
+    btn.className = "pill " + (on ? "pill-on" : "pill-off");
+    btn.textContent = p;
+    btn.onclick = () => {
+      if (STATE.includedPlatforms.has(p)) STATE.includedPlatforms.delete(p);
+      else STATE.includedPlatforms.add(p);
+      updateUI();
+    };
+    wrap.appendChild(btn);
   }
 }
 
+// ========= KPIs =========
+function renderKPIs(rows) {
+  const totals = rows.reduce((acc, r) => {
+    acc.posts += 1;
+    acc.likes += r.likes;
+    acc.comments += r.comments;
+    acc.shares += r.shares;
+    acc.views += r.views;
+    return acc;
+  }, { posts: 0, likes: 0, comments: 0, shares: 0, views: 0 });
+  document.getElementById("kpiPosts").textContent = totals.posts.toLocaleString();
+  document.getElementById("kpiLikes").textContent = totals.likes.toLocaleString();
+  document.getElementById("kpiComments").textContent = totals.comments.toLocaleString();
+  document.getElementById("kpiShares").textContent = totals.shares.toLocaleString();
+  document.getElementById("kpiViews").textContent = totals.views.toLocaleString();
+}
+
+// ========= Charts =========
 let engagementChart = null;
-function renderChart(byPlatform) {
-  const ctx = document.getElementById("engagementChart").getContext("2d");
-  const labels = Object.keys(byPlatform);
-  const values = labels.map(k => byPlatform[k].engagement);
+let stackedChart = null;
 
-  if (engagementChart) {
-    engagementChart.destroy();
-  }
+function renderEngagementChart(by) {
+  const ctx = document.getElementById("engagementChart").getContext("2d");
+  const labels = Object.keys(by);
+  const values = labels.map(k => by[k].engagement);
+  if (engagementChart) engagementChart.destroy();
   engagementChart = new Chart(ctx, {
+    type: "bar",
+    data: { labels, datasets: [{ label: "Engagement", data: values }] },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false }, tooltip: { mode: "index", intersect: false } },
+      scales: { x: { ticks: { autoSkip: false } }, y: { beginAtZero: true } }
+    }
+  });
+}
+
+function renderStackedChart(by) {
+  const ctx = document.getElementById("stackedChart").getContext("2d");
+  const labels = Object.keys(by);
+  const likes = labels.map(k => by[k].likes);
+  const comments = labels.map(k => by[k].comments);
+  const shares = labels.map(k => by[k].shares);
+  const views = labels.map(k => by[k].views);
+  if (stackedChart) stackedChart.destroy();
+  stackedChart = new Chart(ctx, {
     type: "bar",
     data: {
       labels,
-      datasets: [{
-        label: "Total Engagement",
-        data: values
-      }]
+      datasets: [
+        { label: "Likes", data: likes },
+        { label: "Comments", data: comments },
+        { label: "Shares", data: shares },
+        { label: "Views", data: views }
+      ]
     },
     options: {
       responsive: true,
-      plugins: {
-        legend: { display: false },
-        tooltip: { mode: "index", intersect: false }
-      },
-      scales: {
-        x: { ticks: { autoSkip: false } },
-        y: { beginAtZero: true }
-      }
+      plugins: { legend: { position: "top" } },
+      scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } }
     }
   });
+}
+
+// ========= Table =========
+function sortRows(rows, sortBy) {
+  const keyed = rows.map(r => ({ ...r, engagement: r.likes + r.comments + r.shares + r.views }));
+  const map = {
+    engagement_desc: (a,b)=>b.engagement - a.engagement,
+    date_desc: (a,b)=>(b.date?.getTime()||0) - (a.date?.getTime()||0),
+    likes_desc: (a,b)=>b.likes - a.likes,
+    comments_desc: (a,b)=>b.comments - a.comments,
+    views_desc: (a,b)=>b.views - a.views
+  };
+  return keyed.sort(map[sortBy] || map.engagement_desc).slice(0, 30);
 }
 
 function renderTopTable(rows) {
   const tbody = document.querySelector("#topTable tbody");
   tbody.innerHTML = "";
-  // compute engagement per row
-  const ranked = rows.map(r => ({
-    ...r,
-    engagement: r.likes + r.comments + r.shares + r.views
-  })).sort((a,b)=>b.engagement - a.engagement).slice(0, 15);
-
+  const ranked = sortRows(rows, STATE.sortBy);
   for (const r of ranked) {
     const dateStr = r.date ? r.date.toISOString().slice(0,10) : "—";
-    const link = r.url ? `<a class="text-blue-600 hover:underline" href="${r.url}" target="_blank" rel="noopener">Open</a>` : "—";
+    const link = r.url ? `<a class="text-blue-600 hover:underline" href="${r.url}" target="_blank" rel="noopener">Нээх</a>` : "—";
     const tr = document.createElement("tr");
+    tr.className = "border-b border-slate-100 dark:border-slate-800";
     tr.innerHTML = `
       <td class="px-3 py-2">${r.platform}</td>
-      <td class="px-3 py-2">${textShort(r.text, 100)}</td>
+      <td class="px-3 py-2">${textShort(r.text, 120)}</td>
       <td class="px-3 py-2 text-right">${dateStr}</td>
-      <td class="px-3 py-2 text-right">${r.engagement.toLocaleString()}</td>
+      <td class="px-3 py-2 text-right">${r.likes.toLocaleString()}</td>
+      <td class="px-3 py-2 text-right">${r.comments.toLocaleString()}</td>
+      <td class="px-3 py-2 text-right">${r.shares.toLocaleString()}</td>
+      <td class="px-3 py-2 text-right">${r.views.toLocaleString()}</td>
+      <td class="px-3 py-2 text-right">${(r.engagement).toLocaleString()}</td>
       <td class="px-3 py-2 text-right">${link}</td>
     `;
     tbody.appendChild(tr);
   }
 }
 
+// ========= UI & Events =========
 function updateUI() {
   applyFilter();
-  const byPlatform = computeSummaries(STATE.filtered);
-  renderCards(byPlatform);
-  renderChart(byPlatform);
+  const by = computeByPlatform(STATE.filtered);
+  renderKPIs(STATE.filtered);
+  renderEngagementChart(by);
+  renderStackedChart(by);
   renderTopTable(STATE.filtered);
+  renderPlatformPills(); // refresh pill styles
+  // sync selects
+  document.getElementById("range").value = STATE.range;
+  document.getElementById("sortBy").value = STATE.sortBy;
+}
+
+function initTheme() {
+  const root = document.documentElement;
+  const saved = localStorage.getItem("theme") || "dark";
+  if (saved === "dark") root.classList.add("dark"); else root.classList.remove("dark");
+  const btn = document.getElementById("themeToggle");
+  const apply = () => {
+    if (root.classList.contains("dark")) {
+      root.classList.remove("dark"); localStorage.setItem("theme","light");
+      btn.classList.remove("pill-on"); btn.classList.add("pill-off");
+    } else {
+      root.classList.add("dark"); localStorage.setItem("theme","dark");
+      btn.classList.remove("pill-off"); btn.classList.add("pill-on");
+    }
+  };
+  // initial style
+  if (root.classList.contains("dark")) { btn.classList.add("pill-on"); } else { btn.classList.add("pill-off"); }
+  btn.addEventListener("click", apply);
 }
 
 function init() {
+  initTheme();
   STATE.all = normalizeAll();
   STATE.range = (document.getElementById("range").value);
-  document.getElementById("range").addEventListener("change", (e) => {
-    STATE.range = e.target.value;
-    updateUI();
-  });
+  document.getElementById("range").addEventListener("change", (e) => { STATE.range = e.target.value; updateUI(); });
+  document.getElementById("sortBy").addEventListener("change", (e) => { STATE.sortBy = e.target.value; updateUI(); });
   updateUI();
 }
 

@@ -4,47 +4,87 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Social Issues – Rapid Dashboard</title>
+    <title>Social Media Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+      .card { @apply p-5 rounded-2xl shadow bg-white/80 dark:bg-slate-800 border border-slate-100 dark:border-slate-700; }
+      .pill { @apply px-3 py-1.5 rounded-full border text-sm cursor-pointer select-none; }
+      .pill-on { @apply bg-slate-900 text-white border-slate-900 dark:bg-white dark:text-slate-900 dark:border-white; }
+      .pill-off { @apply bg-white text-slate-700 border-slate-300 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-600; }
+      .kpi { @apply text-2xl font-semibold; }
+      .kpi-label { @apply text-xs text-slate-500; }
+    </style>
   </head>
-  <body class="h-full bg-slate-50 text-slate-900 dark:bg-slate-900 dark:text-slate-100">
+  <body class="h-full bg-gradient-to-b from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-950 text-slate-900 dark:text-slate-100">
     <div class="max-w-7xl mx-auto p-4 md:p-6 space-y-6">
+      <!-- Header -->
       <header class="flex items-center justify-between">
-        <h1 class="text-2xl md:text-3xl font-bold">Яаралтай Нийгмийн Сэдэв – Нэгдсэн Дашбоард</h1>
+        <div>
+          <h1 class="text-2xl md:text-3xl font-bold tracking-tight">Social Media Dashboard</h1>
+          <p class="text-sm text-slate-500 mt-1">Нэгдсэн харагдац · Шүүлтүүртэй · Статик байршуулалт</p>
+        </div>
         <div class="flex items-center gap-2">
-          <label for="range" class="text-sm text-gray-500">Хугацаа:</label>
-          <select id="range" class="bg-white/70 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm">
-            <option value="all">Бүгд</option>
-            <option value="d7">Сүүлийн 7 хоног</option>
-            <option value="d30">Сүүлийн 30 өдөр</option>
-            <option value="d90">Сүүлийн 90 өдөр</option>
-            <option value="y2024">Зөвхөн 2024 он</option>
-          </select>
+          <button id="themeToggle" class="pill pill-off" title="Dark/Light">Theme</button>
         </div>
       </header>
 
-      <section>
-        <div class="flex gap-3 overflow-x-auto" id="cards"></div>
+      <!-- Controls -->
+      <section class="card">
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div class="flex items-center gap-3">
+            <label for="range" class="text-sm text-slate-500">Хугацаа</label>
+            <select id="range" class="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-sm">
+              <option value="all">Бүгд</option>
+              <option value="d7">Сүүлийн 7 хоног</option>
+              <option value="d30">Сүүлийн 30 өдөр</option>
+              <option value="d90">Сүүлийн 90 өдөр</option>
+              <option value="y2024">Зөвхөн 2024 он</option>
+            </select>
+          </div>
+
+          <div class="flex items-center gap-2 flex-wrap" id="platformFilters">
+            <!-- pills rendered by JS -->
+          </div>
+        </div>
       </section>
 
-      <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div class="lg:col-span-2 p-4 bg-white/70 dark:bg-slate-800 rounded-2xl shadow">
-          <div class="text-sm text-gray-500 mb-2">Engagement by Platform</div>
+      <!-- KPI Row -->
+      <section class="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div class="card"><div class="kpi" id="kpiPosts">0</div><div class="kpi-label">Нийт пост</div></div>
+        <div class="card"><div class="kpi" id="kpiLikes">0</div><div class="kpi-label">Нийт лайк</div></div>
+        <div class="card"><div class="kpi" id="kpiComments">0</div><div class="kpi-label">Нийт сэтгэгдэл</div></div>
+        <div class="card"><div class="kpi" id="kpiShares">0</div><div class="kpi-label">Нийт шэйр</div></div>
+        <div class="card"><div class="kpi" id="kpiViews">0</div><div class="kpi-label">Нийт үзэлт</div></div>
+      </section>
+
+      <!-- Charts -->
+      <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="card">
+          <div class="text-sm text-slate-500 mb-2">Engagement by Platform</div>
           <canvas id="engagementChart" height="120"></canvas>
         </div>
-        <div class="p-4 bg-white/70 dark:bg-slate-800 rounded-2xl shadow">
-          <div class="text-sm text-gray-500 mb-2">Тайлбар</div>
-          <ul class="list-disc pl-5 space-y-1 text-sm text-gray-600 dark:text-gray-300">
-            <li>Engagement = 👍 лайк + 💬 сэтгэгдэл + 🔁 шэйр + ▶️ үзэлт.</li>
-            <li>Зарим платформд огноо тодорхойгүй (ж. YouTube - "Streamed ... ago") тул хугацааны шүүлтүүрт оролцохгүй.</li>
-            <li>Шууд байрлуулахад бэлэн – статикийн вэб (CDN ашигласан).</li>
-          </ul>
+        <div class="card">
+          <div class="text-sm text-slate-500 mb-2">Engagement Breakdown (Stacked)</div>
+          <canvas id="stackedChart" height="120"></canvas>
         </div>
       </section>
 
-      <section class="p-4 bg-white/70 dark:bg-slate-800 rounded-2xl shadow">
-        <div class="text-sm text-gray-500 mb-2">Топ постууд (Engagement-аар)</div>
+      <!-- Table -->
+      <section class="card">
+        <div class="flex items-center justify-between mb-2">
+          <div class="text-sm text-slate-500">Топ постууд (engagement)</div>
+          <div class="text-sm">
+            Sort:
+            <select id="sortBy" class="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-1">
+              <option value="engagement_desc">Engagement ↓</option>
+              <option value="date_desc">Огноо ↓</option>
+              <option value="likes_desc">Лайк ↓</option>
+              <option value="comments_desc">Сэтгэгдэл ↓</option>
+              <option value="views_desc">Үзэлт ↓</option>
+            </select>
+          </div>
+        </div>
         <div class="overflow-x-auto">
           <table id="topTable" class="min-w-full text-sm">
             <thead>
@@ -52,6 +92,10 @@
                 <th class="px-3 py-2">Платформ</th>
                 <th class="px-3 py-2">Текст</th>
                 <th class="px-3 py-2 text-right">Огноо</th>
+                <th class="px-3 py-2 text-right">Лайк</th>
+                <th class="px-3 py-2 text-right">Сэтгэгдэл</th>
+                <th class="px-3 py-2 text-right">Шэйр</th>
+                <th class="px-3 py-2 text-right">Үзэлт</th>
                 <th class="px-3 py-2 text-right">Engagement</th>
                 <th class="px-3 py-2 text-right">Линк</th>
               </tr>
@@ -61,8 +105,8 @@
         </div>
       </section>
 
-      <footer class="text-xs text-gray-500">
-        <p>© 2025 Rapid Social Dashboard</p>
+      <footer class="text-xs text-slate-500">
+        <p>© 2025 Social Media Dashboard</p>
       </footer>
     </div>
 
