@@ -1,0 +1,72 @@
+
+<!doctype html>
+<html lang="mn" class="h-full">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Social Issues – Rapid Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  </head>
+  <body class="h-full bg-slate-50 text-slate-900 dark:bg-slate-900 dark:text-slate-100">
+    <div class="max-w-7xl mx-auto p-4 md:p-6 space-y-6">
+      <header class="flex items-center justify-between">
+        <h1 class="text-2xl md:text-3xl font-bold">Яаралтай Нийгмийн Сэдэв – Нэгдсэн Дашбоард</h1>
+        <div class="flex items-center gap-2">
+          <label for="range" class="text-sm text-gray-500">Хугацаа:</label>
+          <select id="range" class="bg-white/70 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm">
+            <option value="all">Бүгд</option>
+            <option value="d7">Сүүлийн 7 хоног</option>
+            <option value="d30">Сүүлийн 30 өдөр</option>
+            <option value="d90">Сүүлийн 90 өдөр</option>
+            <option value="y2024">Зөвхөн 2024 он</option>
+          </select>
+        </div>
+      </header>
+
+      <section>
+        <div class="flex gap-3 overflow-x-auto" id="cards"></div>
+      </section>
+
+      <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="lg:col-span-2 p-4 bg-white/70 dark:bg-slate-800 rounded-2xl shadow">
+          <div class="text-sm text-gray-500 mb-2">Engagement by Platform</div>
+          <canvas id="engagementChart" height="120"></canvas>
+        </div>
+        <div class="p-4 bg-white/70 dark:bg-slate-800 rounded-2xl shadow">
+          <div class="text-sm text-gray-500 mb-2">Тайлбар</div>
+          <ul class="list-disc pl-5 space-y-1 text-sm text-gray-600 dark:text-gray-300">
+            <li>Engagement = 👍 лайк + 💬 сэтгэгдэл + 🔁 шэйр + ▶️ үзэлт.</li>
+            <li>Зарим платформд огноо тодорхойгүй (ж. YouTube - "Streamed ... ago") тул хугацааны шүүлтүүрт оролцохгүй.</li>
+            <li>Шууд байрлуулахад бэлэн – статикийн вэб (CDN ашигласан).</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="p-4 bg-white/70 dark:bg-slate-800 rounded-2xl shadow">
+        <div class="text-sm text-gray-500 mb-2">Топ постууд (Engagement-аар)</div>
+        <div class="overflow-x-auto">
+          <table id="topTable" class="min-w-full text-sm">
+            <thead>
+              <tr class="text-left border-b border-slate-200 dark:border-slate-700">
+                <th class="px-3 py-2">Платформ</th>
+                <th class="px-3 py-2">Текст</th>
+                <th class="px-3 py-2 text-right">Огноо</th>
+                <th class="px-3 py-2 text-right">Engagement</th>
+                <th class="px-3 py-2 text-right">Линк</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <footer class="text-xs text-gray-500">
+        <p>© 2025 Rapid Social Dashboard</p>
+      </footer>
+    </div>
+
+    <script src="data.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
