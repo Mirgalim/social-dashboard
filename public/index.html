@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="mn" class="h-full">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Social Search Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  </head>
+  <body class="h-full bg-slate-50 text-slate-900">
+    <div class="max-w-7xl mx-auto p-4 md:p-6 space-y-6">
+      <header class="flex items-center justify-between">
+        <div>
+          <h1 class="text-2xl md:text-3xl font-bold tracking-tight">Social Search Dashboard</h1>
+          <p class="text-sm text-slate-500 mt-1">Нийтийн сүлжээнээс түлхүүр үгээр сүүлийн мэдээллүүд</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <input id="q" class="px-3 py-2 rounded-xl border border-slate-300" placeholder="xacbank, ...">
+          <button id="searchBtn" class="px-3 py-2 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-sm">Хайх</button>
+          <span id="status" class="text-xs text-slate-500"></span>
+        </div>
+      </header>
+
+      <section class="p-5 rounded-2xl shadow bg-white border border-slate-200 space-y-3">
+        <div class="flex items-center gap-3 flex-wrap" id="platformFilters"></div>
+
+        <div class="flex items-center gap-3 flex-wrap">
+          <label class="text-sm text-slate-500">Хугацаа</label>
+          <select id="range" class="bg-white border border-slate-300 rounded-xl px-3 py-2 text-sm">
+            <option value="all">Бүгд</option>
+            <option value="d7">Сүүлийн 7 хоног</option>
+            <option value="d30">Сүүлийн 30 өдөр</option>
+            <option value="d90">Сүүлийн 90 өдөр</option>
+            <option value="y2024">Зөвхөн 2024 он</option>
+          </select>
+
+          <div class="w-px h-6 bg-slate-200"></div>
+
+          <label class="text-sm text-slate-500">Sort</label>
+          <select id="sortBy" class="bg-white border border-slate-300 rounded-lg px-2 py-1">
+            <option value="date_desc">Огноо ↓</option>
+            <option value="engagement_desc">Engagement ↓</option>
+            <option value="likes_desc">Лайк ↓</option>
+            <option value="comments_desc">Сэтгэгдэл ↓</option>
+            <option value="views_desc">Үзэлт ↓</option>
+          </select>
+        </div>
+      </section>
+
+      <section class="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div class="p-5 rounded-2xl shadow bg-white border border-slate-200"><div class="text-2xl font-semibold" id="kpiPosts">0</div><div class="text-xs text-slate-500">Нийт бичлэг</div></div>
+        <div class="p-5 rounded-2xl shadow bg-white border border-slate-200"><div class="text-2xl font-semibold" id="kpiLikes">0</div><div class="text-xs text-slate-500">Нийт лайк</div></div>
+        <div class="p-5 rounded-2xl shadow bg-white border border-slate-200"><div class="text-2xl font-semibold" id="kpiComments">0</div><div class="text-xs text-slate-500">Нийт сэтгэгдэл</div></div>
+        <div class="p-5 rounded-2xl shadow bg-white border border-slate-200"><div class="text-2xl font-semibold" id="kpiShares">0</div><div class="text-xs text-slate-500">Нийт шэйр</div></div>
+        <div class="p-5 rounded-2xl shadow bg-white border border-slate-200"><div class="text-2xl font-semibold" id="kpiViews">0</div><div class="text-xs text-slate-500">Нийт үзэлт</div></div>
+      </section>
+
+      <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="p-5 rounded-2xl shadow bg-white border border-slate-200">
+          <div class="text-sm text-slate-500 mb-2">Engagement by Platform</div>
+          <canvas id="engagementChart" height="120"></canvas>
+        </div>
+        <div class="p-5 rounded-2xl shadow bg-white border border-slate-200">
+          <div class="text-sm text-slate-500 mb-2">Breakdown (Stacked)</div>
+          <canvas id="stackedChart" height="120"></canvas>
+        </div>
+      </section>
+
+      <section class="p-5 rounded-2xl shadow bg-white border border-slate-200">
+        <div class="flex items-center justify-between mb-2">
+          <div class="text-sm text-slate-500">Илэрцүүд</div>
+        </div>
+        <div class="overflow-x-auto">
+          <table id="topTable" class="min-w-full text-sm">
+            <thead>
+              <tr class="text-left border-b border-slate-200">
+                <th class="px-3 py-2">Платформ</th>
+                <th class="px-3 py-2">Текст</th>
+                <th class="px-3 py-2 text-right">Огноо</th>
+                <th class="px-3 py-2 text-right">Лайк</th>
+                <th class="px-3 py-2 text-right">Сэтгэгдэл</th>
+                <th class="px-3 py-2 text-right">Шэйр</th>
+                <th class="px-3 py-2 text-right">Үзэлт</th>
+                <th class="px-3 py-2 text-right">Engagement</th>
+                <th class="px-3 py-2 text-right">Линк</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <footer class="text-xs text-slate-500"><p>© 2025 Social Search Dashboard</p></footer>
+    </div>
+    <script src="app.js"></script>
+  </body>
+</html>

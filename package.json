@@ -1,25 +1,12 @@
 {
-  "name": "social-dashboard",
+  "name": "social-search",
   "version": "1.0.0",
-  "description": "A static, single-page dashboard that bundles your JSON datasets (Instagram, YouTube, Facebook, TikTok, Twitter) and renders: - Summary cards by platform - Engagement-by-platform bar chart - Top posts table",
-  "main": "app.js",
+  "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node server.mjs"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/Mirgalim/social-dashboard.git"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "bugs": {
-    "url": "https://github.com/Mirgalim/social-dashboard/issues"
-  },
-  "homepage": "https://github.com/Mirgalim/social-dashboard#readme",
   "dependencies": {
-    "express": "^5.1.0",
-    "fast-xml-parser": "^5.2.5",
-    "node-fetch": "^3.3.2"
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2"
   }
 }
