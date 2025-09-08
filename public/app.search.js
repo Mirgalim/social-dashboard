@@ -158,8 +158,26 @@ async function runSearch(){
   const qv = $("q").value.trim();
   if (!qv) { $("status").textContent = "Түлхүүр үгээ оруулна уу"; return; }
   $("status").textContent = "Loading…";
-  try{
-    const r = await fetch(`${API_BASE}/api/search?q=${encodeURIComponent(qv)}`);
+
+  const url = `${API_BASE}/api/search?q=${encodeURIComponent(qv)}`;
+  console.log("FETCH:", url);
+
+  const ac = new AbortController();
+  const t = setTimeout(() => ac.abort("timeout"), 15000); // 15s timeout
+
+  try {
+    const r = await fetch(url, {
+      method: "GET",
+      mode: "cors",
+      headers: { Accept: "application/json" }, // сонголттой
+      signal: ac.signal
+    });
+
+    if (!r.ok) {
+      const body = await r.text().catch(()=>"(no body)");
+      throw new Error(`API ${r.status} ${r.statusText} — ${body.slice(0,200)}`);
+    }
+
     const j = await r.json();
     const rows = (j.data || []).map(x => ({ ...x, date: x.date ? parseDateFlexible(x.date) : null }));
     STATE.all = rows;
@@ -167,12 +185,14 @@ async function runSearch(){
     STATE.lastUpdated = new Date();
     updateUI();
   } catch (e) {
-    STATE.errors = { fetch: String(e?.message || e) };
-    updateUI();
+    console.error("SEARCH ERROR:", e);
+    $("status").textContent = `⚠️ ${String(e?.message || e)}`;
   } finally {
-    // noop
+    clearTimeout(t);
   }
 }
+
+
 
 function init(){
   $("searchBtn").addEventListener("click", runSearch);
