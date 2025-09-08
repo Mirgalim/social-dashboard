@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Social Media Dashboard (Public Feeds)</title>
+    <title>Social Media Dashboard – Unified API</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -21,7 +21,7 @@
       <header class="flex items-center justify-between">
         <div>
           <h1 class="text-2xl md:text-3xl font-bold tracking-tight">Social Media Dashboard</h1>
-          <p class="text-sm text-slate-500 mt-1">Public feeds (proxy + XML parse) ашиглаж харуулж байна</p>
+          <p class="text-sm text-slate-500 mt-1">Нэгтгэсэн /api/social endpoint-оос татаж байна</p>
         </div>
         <div class="flex items-center gap-2">
           <button id="themeToggle" class="pill pill-off">Theme</button>
@@ -31,26 +31,22 @@
       <section class="card space-y-3">
         <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div class="flex items-center gap-3 flex-wrap">
-            <label for="range" class="text-sm text-slate-500">Хугацаа</label>
-            <select id="range" class="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-sm">
-              <option value="all">Бүгд</option>
-              <option value="d7">Сүүлийн 7 хоног</option>
-              <option value="d30">Сүүлийн 30 өдөр</option>
-              <option value="d90">Сүүлийн 90 өдөр</option>
-              <option value="y2024">Зөвхөн 2024 он</option>
-            </select>
+            <label class="text-sm text-slate-500">YouTube UCID</label>
+            <input id="yt" class="px-3 py-2 rounded-xl border dark:bg-slate-900" value="UC_x5XG1OV2P6uZZ5FSM9TQ"/>
 
-            <div class="w-px h-6 bg-slate-200 dark:bg-slate-700"></div>
+            <label class="text-sm text-slate-500">Twitter</label>
+            <input id="tw" class="px-3 py-2 rounded-xl border dark:bg-slate-900" value="elonmusk"/>
 
-            <label for="interval" class="text-sm text-slate-500">Auto refresh</label>
-            <select id="interval" class="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-sm">
-              <option value="30000">30 сек</option>
-              <option value="60000" selected>1 мин</option>
-              <option value="120000">2 мин</option>
-              <option value="300000">5 мин</option>
-            </select>
+            <label class="text-sm text-slate-500">Instagram</label>
+            <input id="ig" class="px-3 py-2 rounded-xl border dark:bg-slate-900" value="instagram"/>
 
-            <button id="refreshBtn" class="pill pill-on">Refresh now</button>
+            <label class="text-sm text-slate-500">TikTok</label>
+            <input id="tk" class="px-3 py-2 rounded-xl border dark:bg-slate-900" value="scout2015"/>
+
+            <label class="text-sm text-slate-500">Facebook Page</label>
+            <input id="fb" class="px-3 py-2 rounded-xl border dark:bg-slate-900" value="Meta"/>
+
+            <button id="refreshBtn" class="pill pill-on">Refresh</button>
             <span id="loader" class="badge" style="display:none">Loading…</span>
           </div>
 
@@ -73,7 +69,7 @@
           <canvas id="engagementChart" height="120"></canvas>
         </div>
         <div class="card">
-          <div class="text-sm text-slate-500 mb-2">Engagement Breakdown (Stacked)</div>
+          <div class="text-sm text-slate-500 mb-2">Breakdown (Stacked)</div>
           <canvas id="stackedChart" height="120"></canvas>
         </div>
       </section>
@@ -83,7 +79,7 @@
           <div class="text-sm text-slate-500">Топ постууд</div>
           <div class="text-sm">
             Sort:
-            <select id="sortBy" class="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-1">
+            <select id="sortBy" class="bg-white dark:bg-slate-900 border rounded-lg px-2 py-1">
               <option value="engagement_desc">Engagement ↓</option>
               <option value="date_desc">Огноо ↓</option>
               <option value="likes_desc">Лайк ↓</option>
