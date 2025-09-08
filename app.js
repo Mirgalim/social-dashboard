@@ -1,5 +1,24 @@
+/* ===================== Config ===================== */
+/** Энд өөрийн API endpoint-уудаа тохируулна. 
+ * Бүх endpoint JSON массив буцаана.
+ *  - /api/instagram -> [{ caption, timestamp, likesCount, commentsCount, videoViewCount, inputUrl }, ...]
+ *  - /api/youtube   -> [{ id, title, description, date, likeCount, commentCount, viewCount }, ...]
+ *  - /api/facebook  -> [{ text|message, date, url, likeCount|reactionCount, commentCount, shareCount, viewCount }, ...]
+ *  - /api/tiktok    -> [{ text, createTimeISO|createTime, webVideoUrl, diggCount, commentCount, shareCount, playCount }, ...]
+ *  - /api/twitter   -> [{ full_text|text, created_at, url, favorite_count|likeCount, reply_count, retweet_count, view_count }, ...]
+ */
+const ENDPOINTS = {
+  instagram: "/api/instagram",
+  youtube: "/api/youtube",
+  facebook: "/api/facebook",
+  tiktok: "/api/tiktok",
+  twitter: "/api/twitter"
+};
 
-// ========= Helpers =========
+// Секунд/минутын polling (хүсвэл UI-аас сольж болно)
+let REFRESH_EVERY_MS = 60_000;
+
+/* ===================== Helpers ===================== */
 function parseDateFlexible(raw) {
   if (!raw && raw !== 0) return null;
   if (typeof raw === "number") {
@@ -11,11 +30,54 @@ function parseDateFlexible(raw) {
   if (!isNaN(d)) return d;
   return null;
 }
-function textShort(s, n = 100) { s = s || ""; return s.length > n ? s.slice(0, n - 1) + "…" : s; }
 
-// ========= Normalization per platform =========
-function normalizeAll() {
+function textShort(s, n = 100) {
+  s = s || "";
+  return s.length > n ? s.slice(0, n - 1) + "…" : s;
+}
+
+function fmtDate(d) {
+  return d ? d.toISOString().slice(0, 10) : "—";
+}
+
+/* ===================== Network ===================== */
+async function fetchJSON(url, signal) {
+  const r = await fetch(url, { signal });
+  if (!r.ok) throw new Error(`${url} -> ${r.status} ${await r.text()}`);
+  return r.json();
+}
+
+/** Бүх платформыг зэрэг татна */
+async function fetchAllPlatforms(signal) {
+  const [instagram, youtube, facebook, tiktok, twitter] = await Promise.allSettled([
+    fetchJSON(ENDPOINTS.instagram, signal),
+    fetchJSON(ENDPOINTS.youtube, signal),
+    fetchJSON(ENDPOINTS.facebook, signal),
+    fetchJSON(ENDPOINTS.tiktok, signal),
+    fetchJSON(ENDPOINTS.twitter, signal)
+  ]);
+
+  const out = {
+    instagram: instagram.status === "fulfilled" ? instagram.value : [],
+    youtube:   youtube.status   === "fulfilled" ? youtube.value   : [],
+    facebook:  facebook.status  === "fulfilled" ? facebook.value  : [],
+    tiktok:    tiktok.status    === "fulfilled" ? tiktok.value    : [],
+    twitter:   twitter.status   === "fulfilled" ? twitter.value   : [],
+    errors: {
+      instagram: instagram.status === "rejected" ? instagram.reason?.message || String(instagram.reason) : null,
+      youtube:   youtube.status   === "rejected" ? youtube.reason?.message   || String(youtube.reason)   : null,
+      facebook:  facebook.status  === "rejected" ? facebook.reason?.message  || String(facebook.reason)  : null,
+      tiktok:    tiktok.status    === "rejected" ? tiktok.reason?.message    || String(tiktok.reason)    : null,
+      twitter:   twitter.status   === "rejected" ? twitter.reason?.message   || String(twitter.reason)   : null
+    }
+  };
+  return out;
+}
+
+/* ===================== Normalization ===================== */
+function normalizeAll(DATA) {
   const out = [];
+
   for (const it of (DATA.instagram || [])) {
     out.push({
       platform: "Instagram",
@@ -25,9 +87,10 @@ function normalizeAll() {
       likes: Number(it.likesCount || 0),
       comments: Number(it.commentsCount || 0),
       shares: 0,
-      views: Number(it.videoViewCount || it.videoPlayCount || 0),
+      views: Number(it.videoViewCount || it.videoPlayCount || 0)
     });
   }
+
   for (const it of (DATA.youtube || [])) {
     const url = it.id ? `https://www.youtube.com/watch?v=${it.id}` : null;
     out.push({
@@ -38,21 +101,23 @@ function normalizeAll() {
       likes: Number(it.likeCount || 0),
       comments: Number(it.commentCount || 0),
       shares: 0,
-      views: Number(it.viewCount || 0),
+      views: Number(it.viewCount || 0)
     });
   }
+
   for (const it of (DATA.facebook || [])) {
     out.push({
       platform: "Facebook",
-      text: it.text || (it.message || ""),
+      text: it.text || it.message || "",
       date: parseDateFlexible(it.date),
       url: it.url || null,
       likes: Number(it.likeCount || it.reactionCount || 0),
       comments: Number(it.commentCount || 0),
       shares: Number(it.shareCount || 0),
-      views: Number(it.viewCount || 0),
+      views: Number(it.viewCount || 0)
     });
   }
+
   for (const it of (DATA.tiktok || [])) {
     const dateCandidate = it.createTimeISO || it.createTime;
     out.push({
@@ -63,9 +128,10 @@ function normalizeAll() {
       likes: Number(it.diggCount || 0),
       comments: Number(it.commentCount || 0),
       shares: Number(it.shareCount || 0),
-      views: Number(it.playCount || 0),
+      views: Number(it.playCount || 0)
     });
   }
+
   for (const it of (DATA.twitter || [])) {
     out.push({
       platform: "Twitter",
@@ -75,30 +141,33 @@ function normalizeAll() {
       likes: Number(it.favorite_count || it.likeCount || 0),
       comments: Number(it.reply_count || 0),
       shares: Number(it.retweet_count || 0),
-      views: Number(it.view_count || 0),
+      views: Number(it.view_count || 0)
     });
   }
+
   return out;
 }
 
-// ========= State =========
+/* ===================== State ===================== */
 const ALL_PLATFORMS = ["Instagram", "YouTube", "Facebook", "TikTok", "Twitter"];
 const STATE = {
   all: [],
   filtered: [],
   includedPlatforms: new Set(ALL_PLATFORMS),
   range: "all",
-  sortBy: "engagement_desc"
+  sortBy: "engagement_desc",
+  lastUpdated: null,
+  errors: {}
 };
 
 function inDateRange(d, range) {
   if (!d) return false;
   const now = new Date();
   const start = new Date(now);
-  if (range === "d7") { start.setDate(now.getDate() - 7); return d >= start && d <= now; }
-  if (range === "d30") { start.setDate(now.getDate() - 30); return d >= start && d <= now; }
-  if (range === "d90") { start.setDate(now.getDate() - 90); return d >= start && d <= now; }
-  if (range === "y2024") { return d.getFullYear() === 2024; }
+  if (range === "d7") { start.setDate(now.getDate() - 7);  return d >= start && d <= now; }
+  if (range === "d30"){ start.setDate(now.getDate() - 30); return d >= start && d <= now; }
+  if (range === "d90"){ start.setDate(now.getDate() - 90); return d >= start && d <= now; }
+  if (range === "y2024"){ return d.getFullYear() === 2024; }
   return true;
 }
 
@@ -108,6 +177,7 @@ function applyFilter() {
   );
 }
 
+/* ===================== Aggregations ===================== */
 function computeByPlatform(rows) {
   const by = {};
   for (const r of rows) {
@@ -126,6 +196,7 @@ function computeByPlatform(rows) {
   return by;
 }
 
+/* ===================== UI: pills & KPIs ===================== */
 function renderPlatformPills() {
   const wrap = document.getElementById("platformFilters");
   wrap.innerHTML = "";
@@ -143,7 +214,6 @@ function renderPlatformPills() {
   }
 }
 
-// ========= KPIs =========
 function renderKPIs(rows) {
   const totals = rows.reduce((acc, r) => {
     acc.posts += 1;
@@ -153,6 +223,7 @@ function renderKPIs(rows) {
     acc.views += r.views;
     return acc;
   }, { posts: 0, likes: 0, comments: 0, shares: 0, views: 0 });
+
   document.getElementById("kpiPosts").textContent = totals.posts.toLocaleString();
   document.getElementById("kpiLikes").textContent = totals.likes.toLocaleString();
   document.getElementById("kpiComments").textContent = totals.comments.toLocaleString();
@@ -160,7 +231,7 @@ function renderKPIs(rows) {
   document.getElementById("kpiViews").textContent = totals.views.toLocaleString();
 }
 
-// ========= Charts =========
+/* ===================== Charts ===================== */
 let engagementChart = null;
 let stackedChart = null;
 
@@ -207,15 +278,15 @@ function renderStackedChart(by) {
   });
 }
 
-// ========= Table =========
+/* ===================== Table ===================== */
 function sortRows(rows, sortBy) {
   const keyed = rows.map(r => ({ ...r, engagement: r.likes + r.comments + r.shares + r.views }));
   const map = {
     engagement_desc: (a,b)=>b.engagement - a.engagement,
-    date_desc: (a,b)=>(b.date?.getTime()||0) - (a.date?.getTime()||0),
-    likes_desc: (a,b)=>b.likes - a.likes,
-    comments_desc: (a,b)=>b.comments - a.comments,
-    views_desc: (a,b)=>b.views - a.views
+    date_desc:       (a,b)=>(b.date?.getTime()||0) - (a.date?.getTime()||0),
+    likes_desc:      (a,b)=>b.likes - a.likes,
+    comments_desc:   (a,b)=>b.comments - a.comments,
+    views_desc:      (a,b)=>b.views - a.views
   };
   return keyed.sort(map[sortBy] || map.engagement_desc).slice(0, 30);
 }
@@ -225,7 +296,7 @@ function renderTopTable(rows) {
   tbody.innerHTML = "";
   const ranked = sortRows(rows, STATE.sortBy);
   for (const r of ranked) {
-    const dateStr = r.date ? r.date.toISOString().slice(0,10) : "—";
+    const dateStr = fmtDate(r.date);
     const link = r.url ? `<a class="text-blue-600 hover:underline" href="${r.url}" target="_blank" rel="noopener">Нээх</a>` : "—";
     const tr = document.createElement("tr");
     tr.className = "border-b border-slate-100 dark:border-slate-800";
@@ -237,14 +308,26 @@ function renderTopTable(rows) {
       <td class="px-3 py-2 text-right">${r.comments.toLocaleString()}</td>
       <td class="px-3 py-2 text-right">${r.shares.toLocaleString()}</td>
       <td class="px-3 py-2 text-right">${r.views.toLocaleString()}</td>
-      <td class="px-3 py-2 text-right">${(r.engagement).toLocaleString()}</td>
+      <td class="px-3 py-2 text-right">${(r.likes + r.comments + r.shares + r.views).toLocaleString()}</td>
       <td class="px-3 py-2 text-right">${link}</td>
     `;
     tbody.appendChild(tr);
   }
 }
 
-// ========= UI & Events =========
+/* ===================== Error/Status ===================== */
+function renderStatus() {
+  const el = document.getElementById("status");
+  const parts = [];
+  if (STATE.lastUpdated) parts.push(`Шинэчлэгдсэн: ${STATE.lastUpdated.toLocaleTimeString()}`);
+  const errs = Object.entries(STATE.errors).filter(([,v]) => !!v);
+  if (errs.length) {
+    parts.push("⚠️ Алдаа: " + errs.map(([k,v])=>`${k}: ${v}`).join(" | "));
+  }
+  el.textContent = parts.join(" · ");
+}
+
+/* ===================== UI & Events ===================== */
 function updateUI() {
   applyFilter();
   const by = computeByPlatform(STATE.filtered);
@@ -252,10 +335,11 @@ function updateUI() {
   renderEngagementChart(by);
   renderStackedChart(by);
   renderTopTable(STATE.filtered);
-  renderPlatformPills(); // refresh pill styles
+  renderPlatformPills();
   // sync selects
   document.getElementById("range").value = STATE.range;
   document.getElementById("sortBy").value = STATE.sortBy;
+  renderStatus();
 }
 
 function initTheme() {
@@ -272,18 +356,69 @@ function initTheme() {
       btn.classList.remove("pill-off"); btn.classList.add("pill-on");
     }
   };
-  // initial style
   if (root.classList.contains("dark")) { btn.classList.add("pill-on"); } else { btn.classList.add("pill-off"); }
   btn.addEventListener("click", apply);
 }
 
+/* ===================== Loader ===================== */
+function setLoading(on) {
+  const ld = document.getElementById("loader");
+  if (!ld) return;
+  ld.style.display = on ? "inline-block" : "none";
+}
+
+/* ===================== Refresh cycle ===================== */
+let currentAbort = null;
+let refreshTimer = null;
+
+async function refreshNow() {
+  try {
+    setLoading(true);
+    // cancel previous
+    if (currentAbort) currentAbort.abort();
+    const ctrl = new AbortController();
+    currentAbort = ctrl;
+
+    const data = await fetchAllPlatforms(ctrl.signal);
+    STATE.errors = data.errors || {};
+    const normalized = normalizeAll(data);
+    STATE.all = normalized;
+    STATE.lastUpdated = new Date();
+    updateUI();
+  } catch (e) {
+    STATE.errors = { ...STATE.errors, fetch: e?.message || String(e) };
+    updateUI();
+  } finally {
+    setLoading(false);
+  }
+}
+
+function startAutoRefresh() {
+  if (refreshTimer) clearInterval(refreshTimer);
+  refreshTimer = setInterval(refreshNow, REFRESH_EVERY_MS);
+}
+
+/* ===================== Init ===================== */
 function init() {
   initTheme();
-  STATE.all = normalizeAll();
+
+  // controls
   STATE.range = (document.getElementById("range").value);
   document.getElementById("range").addEventListener("change", (e) => { STATE.range = e.target.value; updateUI(); });
   document.getElementById("sortBy").addEventListener("change", (e) => { STATE.sortBy = e.target.value; updateUI(); });
+  document.getElementById("refreshBtn").addEventListener("click", refreshNow);
+  document.getElementById("interval").addEventListener("change", (e) => {
+    const v = e.target.value;
+    REFRESH_EVERY_MS = Number(v);
+    startAutoRefresh();
+  });
+
+  // prime UI
   updateUI();
+
+  // first fetch + start polling
+  refreshNow();
+  startAutoRefresh();
 }
 
 document.addEventListener("DOMContentLoaded", init);
