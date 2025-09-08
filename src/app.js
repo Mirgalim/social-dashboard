@@ -16,6 +16,15 @@ export function start() {
   // API routes: ЭХЭНД
   app.use("/api/search", searchRouter);
 
+  // Simple CORS (optional, өөр домэйноос дуудах үед хэрэгтэй)
+  app.use((req, res, next) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "GET,OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+    if (req.method === "OPTIONS") return res.sendStatus(200);
+    next();
+  });
+
   // Health
   app.get("/healthz", (_req, res) => res.send("ok"));
 

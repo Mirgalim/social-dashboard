@@ -1,4 +1,5 @@
-// app.js — хайлтын UI
+// app.js — хайлтын UI\
+const API_BASE = "https://social-dashboard-h1su.onrender.com";
 const ALL_PLATFORMS = ["YouTube","Reddit","Facebook","Instagram","TikTok","LinkedIn","Twitter","Web"];
 const STATE = {
   all: [],
@@ -158,7 +159,7 @@ async function runSearch(){
   if (!qv) { $("status").textContent = "Түлхүүр үгээ оруулна уу"; return; }
   $("status").textContent = "Loading…";
   try{
-    const r = await fetch(`/api/search?q=${encodeURIComponent(qv)}`);
+    const r = await fetch(`${API_BASE}/api/search?q=${encodeURIComponent(qv)}`);
     const j = await r.json();
     const rows = (j.data || []).map(x => ({ ...x, date: x.date ? parseDateFlexible(x.date) : null }));
     STATE.all = rows;
