@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Social Media Dashboard</title>
+    <title>Social Media Dashboard (Public APIs)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -22,7 +22,7 @@
       <header class="flex items-center justify-between">
         <div>
           <h1 class="text-2xl md:text-3xl font-bold tracking-tight">Social Media Dashboard</h1>
-          <p class="text-sm text-slate-500 mt-1">API-гаас realtime-д ойр шинэчлэлттэй нэгдсэн харагдац</p>
+          <p class="text-sm text-slate-500 mt-1">Public (no-key) feeds ашиглаж live-д ойр харагдац</p>
         </div>
         <div class="flex items-center gap-2">
           <button id="themeToggle" class="pill pill-off" title="Dark/Light">Theme</button>
@@ -53,14 +53,13 @@
             </select>
 
             <button id="refreshBtn" class="pill pill-on">Refresh now</button>
-            <span id="loader" class="badge">Loading…</span>
+            <span id="loader" class="badge" style="display:none">Loading…</span>
           </div>
 
           <div class="flex items-center gap-2 flex-wrap" id="platformFilters">
             <!-- pills rendered by JS -->
           </div>
         </div>
-
         <div class="text-xs text-slate-500" id="status"></div>
       </section>
 
@@ -125,14 +124,6 @@
       </footer>
     </div>
 
-    <!-- ⚠️ data.js хэрэггүй. API-гаас таталт app.js дотор -->
     <script src="app.js"></script>
-    <script>
-      // Жижиг styling: loader-г анх нуух
-      document.addEventListener("DOMContentLoaded", () => {
-        const ld = document.getElementById("loader");
-        if (ld) ld.style.display = "none";
-      });
-    </script>
   </body>
 </html>

@@ -1,21 +1,18 @@
 /* ===================== Config ===================== */
-/** Энд өөрийн API endpoint-уудаа тохируулна. 
- * Бүх endpoint JSON массив буцаана.
- *  - /api/instagram -> [{ caption, timestamp, likesCount, commentsCount, videoViewCount, inputUrl }, ...]
- *  - /api/youtube   -> [{ id, title, description, date, likeCount, commentCount, viewCount }, ...]
- *  - /api/facebook  -> [{ text|message, date, url, likeCount|reactionCount, commentCount, shareCount, viewCount }, ...]
- *  - /api/tiktok    -> [{ text, createTimeISO|createTime, webVideoUrl, diggCount, commentCount, shareCount, playCount }, ...]
- *  - /api/twitter   -> [{ full_text|text, created_at, url, favorite_count|likeCount, reply_count, retweet_count, view_count }, ...]
- */
-const ENDPOINTS = {
-  instagram: "/api/instagram",
-  youtube: "/api/youtube",
-  facebook: "/api/facebook",
-  tiktok: "/api/tiktok",
-  twitter: "/api/twitter"
+/** USER SETTINGS — энд өөрийн сувгууд/хаягуудыг солино */
+const CONFIG = {
+  youtubeChannelId: "UC_x5XG1OV2P6uZZ5FSM9TQ", // Google Developers (жишээ)
+  twitterUser: "elonmusk",
+  instagramUser: "instagram",
+  tiktokUser: "scout2015", // TikTok demo account (жишээ)
+  facebookPage: "Meta"     // FB page username эсвэл ID
 };
 
-// Секунд/минутын polling (хүсвэл UI-аас сольж болно)
+/** RSSHub public mirror ба RSS → JSON proxy */
+const RSSHUB_BASE = "https://rsshub.app";
+const RSS2JSON = "https://api.rss2json.com/v1/api.json?rss_url=";
+
+/** Авто refresh (клиент тал) */
 let REFRESH_EVERY_MS = 60_000;
 
 /* ===================== Helpers ===================== */
@@ -30,122 +27,98 @@ function parseDateFlexible(raw) {
   if (!isNaN(d)) return d;
   return null;
 }
+function textShort(s, n = 100) { s = s || ""; return s.length > n ? s.slice(0, n - 1) + "…" : s; }
+function fmtDate(d) { return d ? d.toISOString().slice(0,10) : "—"; }
 
-function textShort(s, n = 100) {
-  s = s || "";
-  return s.length > n ? s.slice(0, n - 1) + "…" : s;
-}
-
-function fmtDate(d) {
-  return d ? d.toISOString().slice(0, 10) : "—";
-}
-
-/* ===================== Network ===================== */
 async function fetchJSON(url, signal) {
   const r = await fetch(url, { signal });
-  if (!r.ok) throw new Error(`${url} -> ${r.status} ${await r.text()}`);
+  if (!r.ok) throw new Error(`${url} -> ${r.status}`);
   return r.json();
 }
 
-/** Бүх платформыг зэрэг татна */
-async function fetchAllPlatforms(signal) {
-  const [instagram, youtube, facebook, tiktok, twitter] = await Promise.allSettled([
-    fetchJSON(ENDPOINTS.instagram, signal),
-    fetchJSON(ENDPOINTS.youtube, signal),
-    fetchJSON(ENDPOINTS.facebook, signal),
-    fetchJSON(ENDPOINTS.tiktok, signal),
-    fetchJSON(ENDPOINTS.twitter, signal)
-  ]);
+/* ===================== Public data fetchers ===================== */
+/** 1) YOUTUBE (LemnosLIFE noKey) — бодит статистиктой */
+async function fetchYouTubeNoKey(channelId, signal) {
+  // 1) channel -> uploads playlist id
+  const ch = await fetchJSON(`https://yt.lemnoslife.com/noKey/channels?part=contentDetails&id=${channelId}`, signal);
+  const uploads = ch?.items?.[0]?.contentDetails?.relatedPlaylists?.uploads;
+  if (!uploads) return [];
 
-  const out = {
-    instagram: instagram.status === "fulfilled" ? instagram.value : [],
-    youtube:   youtube.status   === "fulfilled" ? youtube.value   : [],
-    facebook:  facebook.status  === "fulfilled" ? facebook.value  : [],
-    tiktok:    tiktok.status    === "fulfilled" ? tiktok.value    : [],
-    twitter:   twitter.status   === "fulfilled" ? twitter.value   : [],
-    errors: {
-      instagram: instagram.status === "rejected" ? instagram.reason?.message || String(instagram.reason) : null,
-      youtube:   youtube.status   === "rejected" ? youtube.reason?.message   || String(youtube.reason)   : null,
-      facebook:  facebook.status  === "rejected" ? facebook.reason?.message  || String(facebook.reason)  : null,
-      tiktok:    tiktok.status    === "rejected" ? tiktok.reason?.message    || String(tiktok.reason)    : null,
-      twitter:   twitter.status   === "rejected" ? twitter.reason?.message   || String(twitter.reason)   : null
-    }
-  };
-  return out;
+  // 2) playlistItems -> get latest 20 video IDs
+  const pl = await fetchJSON(`https://yt.lemnoslife.com/noKey/playlistItems?part=contentDetails&playlistId=${uploads}&maxResults=20`, signal);
+  const ids = (pl?.items || []).map(it => it.contentDetails?.videoId).filter(Boolean);
+  if (!ids.length) return [];
+
+  // 3) videos stats
+  const vids = await fetchJSON(`https://yt.lemnoslife.com/noKey/videos?part=snippet,statistics&id=${ids.join(",")}`, signal);
+  return (vids?.items || []).map(v => ({
+    platform: "YouTube",
+    text: v.snippet?.title || "",
+    date: parseDateFlexible(v.snippet?.publishedAt),
+    url: `https://www.youtube.com/watch?v=${v.id}`,
+    likes: Number(v.statistics?.likeCount || 0),
+    comments: Number(v.statistics?.commentCount || 0),
+    shares: 0,
+    views: Number(v.statistics?.viewCount || 0)
+  }));
 }
 
-/* ===================== Normalization ===================== */
-function normalizeAll(DATA) {
-  const out = [];
+/** 2) RSSHub → rss2json — X/Twitter, Instagram, TikTok, Facebook Page */
+async function fetchViaRSSHub(path, signal) {
+  const rss = `${RSSHUB_BASE}${path}`;
+  const url = `${RSS2JSON}${encodeURIComponent(rss)}`;
+  const j = await fetchJSON(url, signal);
+  const items = j?.items || [];
+  return items.map(it => ({
+    title: it.title || "",
+    link: it.link,
+    pubDate: it.pubDate || it.pubdate || it.date || null,
+    // RSS-д лайк/коммент/үзэлт ихэвчлэн ирдэггүй
+  }));
+}
 
-  for (const it of (DATA.instagram || [])) {
-    out.push({
-      platform: "Instagram",
-      text: it.caption || "",
-      date: parseDateFlexible(it.timestamp),
-      url: it.inputUrl || null,
-      likes: Number(it.likesCount || 0),
-      comments: Number(it.commentsCount || 0),
-      shares: 0,
-      views: Number(it.videoViewCount || it.videoPlayCount || 0)
-    });
-  }
+async function fetchTwitterRSS(user, signal) {
+  const items = await fetchViaRSSHub(`/twitter/user/${encodeURIComponent(user)}`, signal);
+  return items.map(it => ({
+    platform: "Twitter",
+    text: it.title,
+    date: parseDateFlexible(it.pubDate),
+    url: it.link,
+    likes: 0, comments: 0, shares: 0, views: 0
+  }));
+}
 
-  for (const it of (DATA.youtube || [])) {
-    const url = it.id ? `https://www.youtube.com/watch?v=${it.id}` : null;
-    out.push({
-      platform: "YouTube",
-      text: it.title || it.description || "",
-      date: parseDateFlexible(it.date),
-      url,
-      likes: Number(it.likeCount || 0),
-      comments: Number(it.commentCount || 0),
-      shares: 0,
-      views: Number(it.viewCount || 0)
-    });
-  }
+async function fetchInstagramRSS(user, signal) {
+  const items = await fetchViaRSSHub(`/instagram/user/${encodeURIComponent(user)}`, signal);
+  return items.map(it => ({
+    platform: "Instagram",
+    text: it.title,
+    date: parseDateFlexible(it.pubDate),
+    url: it.link,
+    likes: 0, comments: 0, shares: 0, views: 0
+  }));
+}
 
-  for (const it of (DATA.facebook || [])) {
-    out.push({
-      platform: "Facebook",
-      text: it.text || it.message || "",
-      date: parseDateFlexible(it.date),
-      url: it.url || null,
-      likes: Number(it.likeCount || it.reactionCount || 0),
-      comments: Number(it.commentCount || 0),
-      shares: Number(it.shareCount || 0),
-      views: Number(it.viewCount || 0)
-    });
-  }
+async function fetchTikTokRSS(user, signal) {
+  const items = await fetchViaRSSHub(`/tiktok/user/${encodeURIComponent(user)}`, signal);
+  return items.map(it => ({
+    platform: "TikTok",
+    text: it.title,
+    date: parseDateFlexible(it.pubDate),
+    url: it.link,
+    likes: 0, comments: 0, shares: 0, views: 0
+  }));
+}
 
-  for (const it of (DATA.tiktok || [])) {
-    const dateCandidate = it.createTimeISO || it.createTime;
-    out.push({
-      platform: "TikTok",
-      text: it.text || "",
-      date: parseDateFlexible(dateCandidate),
-      url: it.webVideoUrl || null,
-      likes: Number(it.diggCount || 0),
-      comments: Number(it.commentCount || 0),
-      shares: Number(it.shareCount || 0),
-      views: Number(it.playCount || 0)
-    });
-  }
-
-  for (const it of (DATA.twitter || [])) {
-    out.push({
-      platform: "Twitter",
-      text: it.full_text || it.text || "",
-      date: parseDateFlexible(it.created_at),
-      url: it.url || null,
-      likes: Number(it.favorite_count || it.likeCount || 0),
-      comments: Number(it.reply_count || 0),
-      shares: Number(it.retweet_count || 0),
-      views: Number(it.view_count || 0)
-    });
-  }
-
-  return out;
+async function fetchFacebookPageRSS(page, signal) {
+  const items = await fetchViaRSSHub(`/facebook/page/${encodeURIComponent(page)}`, signal);
+  return items.map(it => ({
+    platform: "Facebook",
+    text: it.title,
+    date: parseDateFlexible(it.pubDate),
+    url: it.link,
+    likes: 0, comments: 0, shares: 0, views: 0
+  }));
 }
 
 /* ===================== State ===================== */
@@ -164,10 +137,10 @@ function inDateRange(d, range) {
   if (!d) return false;
   const now = new Date();
   const start = new Date(now);
-  if (range === "d7") { start.setDate(now.getDate() - 7);  return d >= start && d <= now; }
-  if (range === "d30"){ start.setDate(now.getDate() - 30); return d >= start && d <= now; }
-  if (range === "d90"){ start.setDate(now.getDate() - 90); return d >= start && d <= now; }
-  if (range === "y2024"){ return d.getFullYear() === 2024; }
+  if (range === "d7")  { start.setDate(now.getDate() - 7);  return d >= start && d <= now; }
+  if (range === "d30") { start.setDate(now.getDate() - 30); return d >= start && d <= now; }
+  if (range === "d90") { start.setDate(now.getDate() - 90); return d >= start && d <= now; }
+  if (range === "y2024") { return d.getFullYear() === 2024; }
   return true;
 }
 
@@ -177,7 +150,7 @@ function applyFilter() {
   );
 }
 
-/* ===================== Aggregations ===================== */
+/* ===================== Aggregations & UI ===================== */
 function computeByPlatform(rows) {
   const by = {};
   for (const r of rows) {
@@ -190,13 +163,10 @@ function computeByPlatform(rows) {
     p.shares += r.shares;
     p.views += r.views;
   }
-  for (const k in by) {
-    by[k].engagement = by[k].likes + by[k].comments + by[k].shares + by[k].views;
-  }
+  for (const k in by) by[k].engagement = by[k].likes + by[k].comments + by[k].shares + by[k].views;
   return by;
 }
 
-/* ===================== UI: pills & KPIs ===================== */
 function renderPlatformPills() {
   const wrap = document.getElementById("platformFilters");
   wrap.innerHTML = "";
@@ -223,7 +193,6 @@ function renderKPIs(rows) {
     acc.views += r.views;
     return acc;
   }, { posts: 0, likes: 0, comments: 0, shares: 0, views: 0 });
-
   document.getElementById("kpiPosts").textContent = totals.posts.toLocaleString();
   document.getElementById("kpiLikes").textContent = totals.likes.toLocaleString();
   document.getElementById("kpiComments").textContent = totals.comments.toLocaleString();
@@ -231,7 +200,6 @@ function renderKPIs(rows) {
   document.getElementById("kpiViews").textContent = totals.views.toLocaleString();
 }
 
-/* ===================== Charts ===================== */
 let engagementChart = null;
 let stackedChart = null;
 
@@ -243,11 +211,7 @@ function renderEngagementChart(by) {
   engagementChart = new Chart(ctx, {
     type: "bar",
     data: { labels, datasets: [{ label: "Engagement", data: values }] },
-    options: {
-      responsive: true,
-      plugins: { legend: { display: false }, tooltip: { mode: "index", intersect: false } },
-      scales: { x: { ticks: { autoSkip: false } }, y: { beginAtZero: true } }
-    }
+    options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
   });
 }
 
@@ -261,32 +225,24 @@ function renderStackedChart(by) {
   if (stackedChart) stackedChart.destroy();
   stackedChart = new Chart(ctx, {
     type: "bar",
-    data: {
-      labels,
-      datasets: [
-        { label: "Likes", data: likes },
-        { label: "Comments", data: comments },
-        { label: "Shares", data: shares },
-        { label: "Views", data: views }
-      ]
-    },
-    options: {
-      responsive: true,
-      plugins: { legend: { position: "top" } },
-      scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } }
-    }
+    data: { labels, datasets: [
+      { label: "Likes", data: likes },
+      { label: "Comments", data: comments },
+      { label: "Shares", data: shares },
+      { label: "Views", data: views }
+    ]},
+    options: { responsive: true, plugins: { legend: { position: "top" } }, scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } } }
   });
 }
 
-/* ===================== Table ===================== */
 function sortRows(rows, sortBy) {
   const keyed = rows.map(r => ({ ...r, engagement: r.likes + r.comments + r.shares + r.views }));
   const map = {
     engagement_desc: (a,b)=>b.engagement - a.engagement,
-    date_desc:       (a,b)=>(b.date?.getTime()||0) - (a.date?.getTime()||0),
-    likes_desc:      (a,b)=>b.likes - a.likes,
-    comments_desc:   (a,b)=>b.comments - a.comments,
-    views_desc:      (a,b)=>b.views - a.views
+    date_desc: (a,b)=>(b.date?.getTime()||0) - (a.date?.getTime()||0),
+    likes_desc: (a,b)=>b.likes - a.likes,
+    comments_desc: (a,b)=>b.comments - a.comments,
+    views_desc: (a,b)=>b.views - a.views
   };
   return keyed.sort(map[sortBy] || map.engagement_desc).slice(0, 30);
 }
@@ -315,19 +271,15 @@ function renderTopTable(rows) {
   }
 }
 
-/* ===================== Error/Status ===================== */
 function renderStatus() {
   const el = document.getElementById("status");
   const parts = [];
   if (STATE.lastUpdated) parts.push(`Шинэчлэгдсэн: ${STATE.lastUpdated.toLocaleTimeString()}`);
   const errs = Object.entries(STATE.errors).filter(([,v]) => !!v);
-  if (errs.length) {
-    parts.push("⚠️ Алдаа: " + errs.map(([k,v])=>`${k}: ${v}`).join(" | "));
-  }
+  if (errs.length) parts.push("⚠️ " + errs.map(([k,v])=>`${k}: ${v}`).join(" | "));
   el.textContent = parts.join(" · ");
 }
 
-/* ===================== UI & Events ===================== */
 function updateUI() {
   applyFilter();
   const by = computeByPlatform(STATE.filtered);
@@ -336,7 +288,6 @@ function updateUI() {
   renderStackedChart(by);
   renderTopTable(STATE.filtered);
   renderPlatformPills();
-  // sync selects
   document.getElementById("range").value = STATE.range;
   document.getElementById("sortBy").value = STATE.sortBy;
   renderStatus();
@@ -348,23 +299,16 @@ function initTheme() {
   if (saved === "dark") root.classList.add("dark"); else root.classList.remove("dark");
   const btn = document.getElementById("themeToggle");
   const apply = () => {
-    if (root.classList.contains("dark")) {
-      root.classList.remove("dark"); localStorage.setItem("theme","light");
-      btn.classList.remove("pill-on"); btn.classList.add("pill-off");
-    } else {
-      root.classList.add("dark"); localStorage.setItem("theme","dark");
-      btn.classList.remove("pill-off"); btn.classList.add("pill-on");
-    }
+    if (root.classList.contains("dark")) { root.classList.remove("dark"); localStorage.setItem("theme","light"); btn.classList.remove("pill-on"); btn.classList.add("pill-off"); }
+    else { root.classList.add("dark"); localStorage.setItem("theme","dark"); btn.classList.remove("pill-off"); btn.classList.add("pill-on"); }
   };
-  if (root.classList.contains("dark")) { btn.classList.add("pill-on"); } else { btn.classList.add("pill-off"); }
+  if (root.classList.contains("dark")) btn.classList.add("pill-on"); else btn.classList.add("pill-off");
   btn.addEventListener("click", apply);
 }
 
-/* ===================== Loader ===================== */
 function setLoading(on) {
   const ld = document.getElementById("loader");
-  if (!ld) return;
-  ld.style.display = on ? "inline-block" : "none";
+  if (ld) ld.style.display = on ? "inline-block" : "none";
 }
 
 /* ===================== Refresh cycle ===================== */
@@ -374,15 +318,28 @@ let refreshTimer = null;
 async function refreshNow() {
   try {
     setLoading(true);
-    // cancel previous
     if (currentAbort) currentAbort.abort();
     const ctrl = new AbortController();
     currentAbort = ctrl;
 
-    const data = await fetchAllPlatforms(ctrl.signal);
-    STATE.errors = data.errors || {};
-    const normalized = normalizeAll(data);
-    STATE.all = normalized;
+    const [yt, tw, ig, tk, fb] = await Promise.allSettled([
+      fetchYouTubeNoKey(CONFIG.youtubeChannelId, ctrl.signal),
+      fetchTwitterRSS(CONFIG.twitterUser, ctrl.signal),
+      fetchInstagramRSS(CONFIG.instagramUser, ctrl.signal),
+      fetchTikTokRSS(CONFIG.tiktokUser, ctrl.signal),
+      fetchFacebookPageRSS(CONFIG.facebookPage, ctrl.signal)
+    ]);
+
+    const val = s => (s.status === "fulfilled" ? s.value : []);
+    STATE.errors = {
+      youtube:  yt.status === "rejected" ? yt.reason?.message || String(yt.reason) : null,
+      twitter:  tw.status === "rejected" ? tw.reason?.message || String(tw.reason) : null,
+      instagram:ig.status === "rejected" ? ig.reason?.message || String(ig.reason) : null,
+      tiktok:   tk.status === "rejected" ? tk.reason?.message || String(tk.reason) : null,
+      facebook: fb.status === "rejected" ? fb.reason?.message || String(fb.reason) : null
+    };
+
+    STATE.all = [...val(yt), ...val(tw), ...val(ig), ...val(tk), ...val(fb)];
     STATE.lastUpdated = new Date();
     updateUI();
   } catch (e) {
@@ -401,22 +358,13 @@ function startAutoRefresh() {
 /* ===================== Init ===================== */
 function init() {
   initTheme();
-
-  // controls
   STATE.range = (document.getElementById("range").value);
   document.getElementById("range").addEventListener("change", (e) => { STATE.range = e.target.value; updateUI(); });
   document.getElementById("sortBy").addEventListener("change", (e) => { STATE.sortBy = e.target.value; updateUI(); });
   document.getElementById("refreshBtn").addEventListener("click", refreshNow);
-  document.getElementById("interval").addEventListener("change", (e) => {
-    const v = e.target.value;
-    REFRESH_EVERY_MS = Number(v);
-    startAutoRefresh();
-  });
+  document.getElementById("interval").addEventListener("change", (e) => { REFRESH_EVERY_MS = Number(e.target.value); startAutoRefresh(); });
 
-  // prime UI
   updateUI();
-
-  // first fetch + start polling
   refreshNow();
   startAutoRefresh();
 }
