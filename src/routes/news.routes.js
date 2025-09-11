@@ -1,6 +1,5 @@
-// routes/news.routes.js
 import { Router } from "express";
-import { perplexityNewsSearch } from "../services/perplexity.service.js";
+import { perplexityChat } from "../services/perplexity.service.js";
 
 export const router = Router();
 
@@ -9,7 +8,7 @@ router.get("/", async (req, res) => {
   if (!q) return res.status(400).json({ ok: false, error: "Missing q" });
 
   try {
-    const data = await perplexityNewsSearch(q);
+    const data = await perplexityChat(q);
     res.json({ ok: true, ...data });
   } catch (e) {
     console.error("Perplexity error:", e);
