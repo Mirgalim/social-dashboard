@@ -5,6 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { router as searchRouter } from "./routes/search.routes.js";
 import { router as newsRouter } from "./routes/news.routes.js";
+import { router as pplxRouter } from "./routes/pplx.routes.js";   // <<< NEW
 import { env } from "./config/env.js";
 
 dotenv.config();
@@ -15,13 +16,13 @@ const __dirname = path.dirname(__filename);
 export function start() {
   const app = express();
 
-  // --- CORS (бүх origin-д нээлттэй)
-  app.use(cors({ origin: "*", methods: ["GET", "OPTIONS"] }));
+  // CORS
+  app.use(cors({ origin: "*", methods: ["GET","POST","OPTIONS"] }));
 
-  app.use("/api/news", newsRouter);
-
-  // API
+  // Routes
   app.use("/api/search", searchRouter);
+  app.use("/api/news", newsRouter);
+  app.use("/api/pplx", pplxRouter);     // <<< NEW
 
   // Health
   app.get("/healthz", (_req, res) => res.send("ok"));
