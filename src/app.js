@@ -4,6 +4,7 @@ import dotenv from "dotenv";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { router as searchRouter } from "./routes/search.routes.js";
+import { router as newsRouter } from "./routes/news.routes.js";
 import { env } from "./config/env.js";
 
 dotenv.config();
@@ -16,6 +17,8 @@ export function start() {
 
   // --- CORS (бүх origin-д нээлттэй)
   app.use(cors({ origin: "*", methods: ["GET", "OPTIONS"] }));
+
+  app.use("/api/news", newsRouter);
 
   // API
   app.use("/api/search", searchRouter);

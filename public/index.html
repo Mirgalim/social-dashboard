@@ -17,13 +17,15 @@
         <div class="flex items-center gap-2">
           <input id="q" class="px-3 py-2 rounded-xl border border-slate-300" placeholder="xacbank, ...">
           <button id="searchBtn" class="px-3 py-2 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-sm">Хайх</button>
+          <!-- NEW: News -->
+          <button id="newsBtn" class="px-3 py-2 rounded-xl border border-indigo-300 bg-indigo-50 hover:bg-indigo-100 text-sm">News</button>
           <span id="status" class="text-xs text-slate-500"></span>
         </div>
       </header>
 
+      <!-- Filters -->
       <section class="p-5 rounded-2xl shadow bg-white border border-slate-200 space-y-3">
         <div class="flex items-center gap-3 flex-wrap" id="platformFilters"></div>
-
         <div class="flex items-center gap-3 flex-wrap">
           <label class="text-sm text-slate-500">Хугацаа</label>
           <select id="range" class="bg-white border border-slate-300 rounded-xl px-3 py-2 text-sm">
@@ -47,6 +49,7 @@
         </div>
       </section>
 
+      <!-- KPIs -->
       <section class="grid grid-cols-2 md:grid-cols-5 gap-4">
         <div class="p-5 rounded-2xl shadow bg-white border border-slate-200"><div class="text-2xl font-semibold" id="kpiPosts">0</div><div class="text-xs text-slate-500">Нийт бичлэг</div></div>
         <div class="p-5 rounded-2xl shadow bg-white border border-slate-200"><div class="text-2xl font-semibold" id="kpiLikes">0</div><div class="text-xs text-slate-500">Нийт лайк</div></div>
@@ -55,6 +58,7 @@
         <div class="p-5 rounded-2xl shadow bg-white border border-slate-200"><div class="text-2xl font-semibold" id="kpiViews">0</div><div class="text-xs text-slate-500">Нийт үзэлт</div></div>
       </section>
 
+      <!-- Charts -->
       <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div class="p-5 rounded-2xl shadow bg-white border border-slate-200">
           <div class="text-sm text-slate-500 mb-2">Engagement by Platform</div>
@@ -66,6 +70,7 @@
         </div>
       </section>
 
+      <!-- Table -->
       <section class="p-5 rounded-2xl shadow bg-white border border-slate-200">
         <div class="flex items-center justify-between mb-2">
           <div class="text-sm text-slate-500">Илэрцүүд</div>
@@ -88,6 +93,13 @@
             <tbody></tbody>
           </table>
         </div>
+      </section>
+
+      <!-- NEW: News/Insights -->
+      <section class="p-5 rounded-2xl shadow bg-white border border-slate-200">
+        <div class="text-sm text-slate-500 mb-2">News / Insights (Perplexity)</div>
+        <div id="newsBox" class="prose max-w-none text-sm whitespace-pre-wrap leading-6"></div>
+        <ul id="newsSources" class="mt-3 list-disc list-inside text-sm text-blue-700"></ul>
       </section>
 
       <footer class="text-xs text-slate-500"><p>© 2025 Social Search Dashboard</p></footer>
