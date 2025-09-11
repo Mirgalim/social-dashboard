@@ -11,7 +11,7 @@ export async function perplexityChat(query) {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "sonar-small-chat",
+      model: "sonar-small-online",  // ✅ зөв model
       messages: [
         { role: "system", content: "You are a helpful assistant that summarizes public news with sources." },
         { role: "user", content: query }
