@@ -194,15 +194,15 @@ function sortRows(rows, sortBy) {
   const keyed = rows.map((r) => ({
     ...r,
     engagement: r.likes + r.comments + r.shares + r.views,
-    _ts: r.date ? (r.date?.getTime?.() || 0) : -1, // null date = -1
+    _ts: r.date ? r.date?.getTime?.() || 0 : -1, // null date = -1
   }));
 
   const map = {
     engagement_desc: (a, b) => b.engagement - a.engagement,
-    date_desc:       (a, b) => b._ts - a._ts, // null-ууд хамгийн сүүлд
-    likes_desc:      (a, b) => b.likes - a.likes,
-    comments_desc:   (a, b) => b.comments - a.comments,
-    views_desc:      (a, b) => b.views - a.views,
+    date_desc: (a, b) => b._ts - a._ts, // null-ууд хамгийн сүүлд
+    likes_desc: (a, b) => b.likes - a.likes,
+    comments_desc: (a, b) => b.comments - a.comments,
+    views_desc: (a, b) => b.views - a.views,
   };
   return keyed.sort(map[sortBy] || map.date_desc).slice(0, 50);
 }
@@ -266,7 +266,7 @@ async function runSearch() {
   }
   $("status").textContent = "Loading…";
 
-  const url = `${API_BASE}/api/search?q=${encodeURIComponent(qv)}`;
+  const url = `${API_BASE}/api/search?q=${encodeURIComponent(qv)}&news=1`;
   try {
     const r = await fetch(url, { headers: { Accept: "application/json" } });
     if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
@@ -279,6 +279,24 @@ async function runSearch() {
     STATE.errors = j.errors || {};
     STATE.lastUpdated = new Date();
     updateUI();
+    if (j.news) {
+      try {
+        const html = window.marked.parse(
+          j.news.summary || j.news.assistant || ""
+        );
+        $("newsBox").innerHTML = html;
+        const ul = $("newsSources");
+        ul.innerHTML = "";
+        (j.news.sources || []).forEach((s) => {
+          const li = document.createElement("li");
+          li.innerHTML = `<a class="hover:underline" href="${s}" target="_blank" rel="noopener">${s}</a>`;
+          ul.appendChild(li);
+        });
+      } catch (_) {
+        // алдаа залгиж, UI-г эвдэхгүй
+      }
+    }
+    $("status").textContent = `OK · ${rows.length} items · ${STATE.lastUpdated.toLocaleTimeString()}`;
   } catch (e) {
     console.error("SEARCH ERROR:", e);
     $("status").textContent = `⚠️ ${String(e?.message || e)}`;
@@ -425,7 +443,6 @@ function init() {
   initTheme();
 
   $("searchBtn").addEventListener("click", runSearch);
-  $("newsBtn").addEventListener("click", runNews);
   $("q").addEventListener("keydown", (e) => {
     if (e.key === "Enter") runSearch();
   });
