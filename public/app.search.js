@@ -192,7 +192,7 @@ function renderStatus() {
   const parts = [];
   if (STATE.lastUpdated) parts.push(`Шинэчлэгдсэн: ${STATE.lastUpdated.toLocaleTimeString()}`);
   const errs = Object.entries(STATE.errors).filter(([, v]) => !!v);
-  if (errs.length) parts.push("⚠️ " + errs.map(([k, v]) => `${k}: ${v}`).join(" | "));
+  // if (errs.length) parts.push("⚠️ " + errs.map(([k, v]) => `${k}: ${v}`).join(" | "));
   $("status").textContent = parts.join(" · ");
 }
 
@@ -250,7 +250,7 @@ async function runSearch() {
     $("status").textContent = `OK · ${rows.length} items · ${STATE.lastUpdated.toLocaleTimeString()}`;
   } catch (e) {
     console.error("SEARCH ERROR:", e);
-    $("status").textContent = `⚠️ ${String(e?.message || e)}`;
+    // $("status").textContent = `⚠️ ${String(e?.message || e)}`;
   }
 }
 
@@ -301,7 +301,7 @@ async function sendChat() {
     $("status").textContent = "Chat ok";
   } catch (e) {
     console.error("CHAT ERROR:", e);
-    $("status").textContent = `⚠️ Chat: ${String(e?.message || e)}`;
+    // $("status").textContent = `⚠️ Chat: ${String(e?.message || e)}`;
   }
 }
 
