@@ -4,35 +4,34 @@ import { fetchJSON } from "../utils/fetchJSON.js";
 const T = (s) => (s ?? "").toString();
 
 /**
- * Reddit нь зарим орчноос /search.json руу шууд GET хийхэд 403 өгч болдог.
- * 1-р оролдлого: шууд reddit.com (custom UA-тай)
- * 2-р fallback: r.jina.ai mirror-р дамжуулж JSON text татаж parse хийх (read-only)
+ * 1-р оролдлого: reddit.com/search.json (custom UA)
+ * 2-р fallback: r.jina.ai mirror (read-only, JSON-г текстээр буцаадаг)
  */
 export async function redditSearch(q, max = 20) {
   if (!q) return [];
   return memo(`rd:${q}:${max}`, 60_000, async () => {
     const base = `https://www.reddit.com/search.json?q=${encodeURIComponent(q)}&sort=new&limit=${Math.min(max, 50)}`;
 
-    // --- Try #1: direct Reddit JSON with UA
+    // Try #1: direct
     try {
       const j = await fetchJSON(base, {
         headers: { "User-Agent": "social-search/1.0 (+https://example.com)" },
       });
       return normalize(j);
-    } catch (_err) {
+    } catch (_) {
       // continue to fallback
     }
 
-    // --- Try #2: mirror via r.jina.ai (returns text)
+    // Try #2: mirror (text → JSON)
     try {
       const mirror = `https://r.jina.ai/http://www.reddit.com/search.json?q=${encodeURIComponent(q)}&sort=new&limit=${Math.min(max, 50)}`;
       const r = await fetch(mirror, { headers: { "User-Agent": "social-search/1.0" } });
       if (!r.ok) throw new Error(`${mirror} -> ${r.status} ${r.statusText}`);
-      const text = await r.text();
-      const j = JSON.parse(text);
+      const txt = await r.text();
+      const j = JSON.parse(txt);
       return normalize(j);
     } catch (err2) {
-      // Final: return empty on hard block
+      // two attempts failed → хоосон буцаая
       return [];
     }
   });
@@ -43,7 +42,7 @@ function normalize(j) {
     const d = ch.data || {};
     return {
       platform: "Reddit",
-      text: T(d.title),
+      text: T(d.title || d.selftext || ""),
       date: d.created_utc ? new Date(d.created_utc * 1000).toISOString() : null,
       url: d.permalink ? `https://www.reddit.com${d.permalink}` : d.url_overridden_by_dest || d.url || null,
       likes: Number(d.score || 0),

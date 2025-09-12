@@ -194,16 +194,19 @@ function sortRows(rows, sortBy) {
   const keyed = rows.map((r) => ({
     ...r,
     engagement: r.likes + r.comments + r.shares + r.views,
+    _ts: r.date ? (r.date?.getTime?.() || 0) : -1, // null date = -1
   }));
+
   const map = {
     engagement_desc: (a, b) => b.engagement - a.engagement,
-    date_desc: (a, b) => (b.date?.getTime() || 0) - (a.date?.getTime() || 0),
-    likes_desc: (a, b) => b.likes - a.likes,
-    comments_desc: (a, b) => b.comments - a.comments,
-    views_desc: (a, b) => b.views - a.views,
+    date_desc:       (a, b) => b._ts - a._ts, // null-ууд хамгийн сүүлд
+    likes_desc:      (a, b) => b.likes - a.likes,
+    comments_desc:   (a, b) => b.comments - a.comments,
+    views_desc:      (a, b) => b.views - a.views,
   };
   return keyed.sort(map[sortBy] || map.date_desc).slice(0, 50);
 }
+
 function renderTopTable(rows) {
   const tbody = $("topTable").querySelector("tbody");
   tbody.innerHTML = "";
