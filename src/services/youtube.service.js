@@ -14,7 +14,7 @@ export async function ytSearch(q, max = 20) {
       type: "video",
       order: "date",
       maxResults: String(Math.min(max, 50)),
-      key: KEY,
+      key: KEY
     });
     const s = await fetchJSON(`https://www.googleapis.com/youtube/v3/search?${qs}`);
     const ids = (s.items || []).map((it) => it.id?.videoId).filter(Boolean);
@@ -30,7 +30,7 @@ export async function ytSearch(q, max = 20) {
       likes: Number(x.statistics?.likeCount || 0),
       comments: Number(x.statistics?.commentCount || 0),
       shares: 0,
-      views: Number(x.statistics?.viewCount || 0),
+      views: Number(x.statistics?.viewCount || 0)
     }));
   });
 }

@@ -4,34 +4,56 @@ import { fetchJSON } from "../utils/fetchJSON.js";
 const T = (s) => (s ?? "").toString();
 
 /**
- * 1-р оролдлого: reddit.com/search.json (custom UA)
- * 2-р fallback: r.jina.ai mirror (read-only, JSON-г текстээр буцаадаг)
+ * Reddit 403 mitigation:
+ * 1) direct reddit.com/search.json (custom UA)
+ * 2) r.jina.ai mirror (www)
+ * 3) r.jina.ai mirror (old.reddit)
+ * 4) r.jina.ai mirror (api.reddit)
  */
 export async function redditSearch(q, max = 20) {
   if (!q) return [];
   return memo(`rd:${q}:${max}`, 60_000, async () => {
-    const base = `https://www.reddit.com/search.json?q=${encodeURIComponent(q)}&sort=new&limit=${Math.min(max, 50)}`;
+    const limit = Math.min(max, 50);
+    const base = `https://www.reddit.com/search.json?q=${encodeURIComponent(q)}&sort=new&limit=${limit}`;
 
     // Try #1: direct
     try {
       const j = await fetchJSON(base, {
-        headers: { "User-Agent": "social-search/1.0 (+https://example.com)" },
+        headers: { "User-Agent": "social-search/1.0 (+https://example.com)" }
       });
       return normalize(j);
-    } catch (_) {
-      // continue to fallback
-    }
+    } catch (_) { /* continue */ }
 
-    // Try #2: mirror (text → JSON)
-    try {
-      const mirror = `https://r.jina.ai/http://www.reddit.com/search.json?q=${encodeURIComponent(q)}&sort=new&limit=${Math.min(max, 50)}`;
-      const r = await fetch(mirror, { headers: { "User-Agent": "social-search/1.0" } });
-      if (!r.ok) throw new Error(`${mirror} -> ${r.status} ${r.statusText}`);
+    // helper
+    const tryMirror = async (u) => {
+      const r = await fetch(u, {
+        headers: {
+          "User-Agent": "social-search/1.0",
+          "Accept": "application/json,text/plain"
+        }
+      });
+      if (!r.ok) throw new Error(`${u} -> ${r.status} ${r.statusText}`);
       const txt = await r.text();
-      const j = JSON.parse(txt);
+      return JSON.parse(txt);
+    };
+
+    // Try #2: www mirror
+    try {
+      const j = await tryMirror(`https://r.jina.ai/http://www.reddit.com/search.json?q=${encodeURIComponent(q)}&sort=new&limit=${limit}`);
       return normalize(j);
-    } catch (err2) {
-      // two attempts failed → хоосон буцаая
+    } catch (_) { /* continue */ }
+
+    // Try #3: old.reddit
+    try {
+      const j = await tryMirror(`https://r.jina.ai/http://old.reddit.com/search.json?q=${encodeURIComponent(q)}&sort=new&limit=${limit}`);
+      return normalize(j);
+    } catch (_) { /* continue */ }
+
+    // Try #4: api.reddit
+    try {
+      const j = await tryMirror(`https://r.jina.ai/http://api.reddit.com/search.json?q=${encodeURIComponent(q)}&sort=new&limit=${limit}`);
+      return normalize(j);
+    } catch (_) {
       return [];
     }
   });
@@ -48,7 +70,7 @@ function normalize(j) {
       likes: Number(d.score || 0),
       comments: Number(d.num_comments || 0),
       shares: 0,
-      views: 0,
+      views: 0
     };
   });
 }

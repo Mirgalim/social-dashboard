@@ -14,17 +14,18 @@ function hostToPlatform(host) {
 }
 
 export async function cseSearch(q, max = 10) {
+  if (!q) return [];
   const KEY = env.CSE_API_KEY;
-  const CX = env.CSE_CX;
-  if (!KEY || !CX || !q) return [];
+  const CX  = env.CSE_CX;
+  if (!KEY || !CX) throw new Error("CSE missing API key or CX");
+
   return memo(`cse:${q}:${max}`, 60_000, async () => {
-    const filter =
-      "(site:facebook.com OR site:instagram.com OR site:tiktok.com OR site:linkedin.com OR site:twitter.com OR site:x.com)";
+    const filter = "(site:facebook.com OR site:instagram.com OR site:tiktok.com OR site:linkedin.com OR site:twitter.com OR site:x.com)";
     const qs = new URLSearchParams({
       key: KEY,
       cx: CX,
       q: `${q} ${filter}`,
-      num: String(Math.min(max, 10)),
+      num: String(Math.min(max, 10))
     });
     const j = await fetchJSON(`https://www.googleapis.com/customsearch/v1?${qs}`);
     return (j.items || []).map((it) => {
@@ -43,7 +44,7 @@ export async function cseSearch(q, max = 10) {
         likes: 0,
         comments: 0,
         shares: 0,
-        views: 0,
+        views: 0
       };
     });
   });
