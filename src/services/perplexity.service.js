@@ -1,30 +1,18 @@
-import { env } from "../config/env.js";
+import { Router } from "express";
+import { perplexityChat } from "../services/perplexity.service.js";
 
-// Perplexity Chat — full assistant response
-export async function perplexityChat(query) {
-  const url = "https://api.perplexity.ai/chat/completions";
+export const router = Router();
 
-  const r = await fetch(url, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${env.PPLX_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "sonar",  // ✅ зөв model
-      messages: [
-        { role: "system", content: "You are a helpful assistant that summarizes public news with sources." },
-        { role: "user", content: query }
-      ],
-      temperature: 0.3,
-    }),
-  });
+router.post("/chat", async (req, res) => {
+  try {
+    const messages = Array.isArray(req.body?.messages) ? req.body.messages : [];
+    const model = typeof req.body?.model === "string" ? req.body.model : "sonar-small-chat";
+    if (!messages.length) return res.status(400).json({ ok: false, error: "Missing messages" });
 
-  if (!r.ok) throw new Error(`Perplexity API error: ${r.status} ${await r.text()}`);
-  const j = await r.json();
-
-  return {
-    messages: j.choices?.[0]?.message ? [ j.choices[0].message ] : [],
-    raw: j,
-  };
-}
+    const data = await perplexityChat(messages, model);
+    return res.json({ ok: true, ...data });
+  } catch (e) {
+    console.error("Perplexity chat error:", e);
+    return res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
