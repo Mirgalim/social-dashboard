@@ -1,143 +1,737 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="mn" class="h-full">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Social Search Dashboard</title>
+
+    <script>
+      if ((localStorage.getItem("theme") || "dark") === "dark") {
+        document.documentElement.classList.add("dark");
+      }
+      window.tailwind = { config: { darkMode: "class" } };
+    </script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <script>
-      if (localStorage.getItem("theme") === "dark") {
-        document.documentElement.classList.add("dark");
-      }
-    </script>
+
     <style>
-      .card { @apply p-5 rounded-2xl shadow bg-white/90 border border-slate-200 dark:bg-slate-800 dark:border-slate-700; }
-      .pill { @apply px-3 py-1.5 rounded-full border text-sm cursor-pointer select-none; }
-      .pill-on { @apply bg-slate-900 text-white border-slate-900 dark:bg-white dark:text-slate-900 dark:border-white; }
-      .pill-off { @apply bg-white text-slate-700 border-slate-300 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-600; }
-      .chat-bubble { @apply max-w-xl rounded-2xl px-4 py-3 mb-2; }
-      .chat-user { @apply bg-indigo-600 text-white ml-auto; }
-      .chat-assistant { @apply bg-slate-100 dark:bg-slate-700 text-slate-900 dark:text-slate-100 mr-auto; }
-      .img-thumb { @apply w-28 h-20 object-cover rounded-xl border border-slate-200 dark:border-slate-700; }
+      :root {
+        --bg: #050814;
+        --fg: #0f172a;
+        --fg-soft: #334155;
+        --card: rgba(255, 255, 255, 0.88);
+        --card-border: rgba(148, 163, 184, 0.35);
+        --muted: #64748b;
+        --brand1: #7c3aed;
+        --brand2: #06b6d4;
+        --brand3: #22d3ee;
+        --grid: #e5e7eb;
+        --tick: #334155;
+        --canvas: #ffffff;
+      }
+      html.dark {
+        --bg: #050814;
+        --fg: #e5e7eb;
+        --fg-soft: #a3b1c2;
+        --card: rgba(15, 23, 42, 0.6);
+        --card-border: rgba(100, 116, 139, 0.35);
+        --muted: #a3b1c2;
+        --grid: #334155;
+        --tick: #94a3b8;
+        --canvas: #0b1220;
+      }
+
+      body {
+        color: var(--fg);
+        background: radial-gradient(
+            1200px 600px at calc(20% + var(--mx, 0px)) -10%,
+            rgba(124, 58, 237, 0.12),
+            transparent 60%
+          ),
+          radial-gradient(
+            1200px 600px at calc(80% + var(--mx, 0px)) -10%,
+            rgba(6, 182, 212, 0.12),
+            transparent 60%
+          ),
+          linear-gradient(
+            180deg,
+            rgba(255, 255, 255, 0.06),
+            rgba(255, 255, 255, 0)
+          ),
+          var(--bg);
+        overflow-x: hidden;
+      }
+      .bg-blobs::before,
+      .bg-blobs::after {
+        content: "";
+        position: fixed;
+        width: 42vw;
+        height: 42vw;
+        border-radius: 50%;
+        filter: blur(50px);
+        opacity: 0.22;
+        z-index: -1;
+        transform: translateZ(0);
+        animation: blobFloat 24s ease-in-out infinite alternate;
+        pointer-events: none;
+      }
+      .bg-blobs::before {
+        top: -10vh;
+        left: -10vw;
+        background: radial-gradient(
+          circle at 30% 30%,
+          #7c3aed,
+          transparent 60%
+        );
+      }
+      .bg-blobs::after {
+        bottom: -14vh;
+        right: -12vw;
+        background: radial-gradient(
+          circle at 70% 70%,
+          #06b6d4,
+          transparent 60%
+        );
+        animation-delay: -8s;
+      }
+      @keyframes blobFloat {
+        0% {
+          transform: translate(-2%, 0) scale(1);
+        }
+        50% {
+          transform: translate(3%, 2%) scale(1.08);
+        }
+        100% {
+          transform: translate(-1%, -1%) scale(0.98);
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          animation: none !important;
+          transition: none !important;
+        }
+        .magnet {
+          transform: none !important;
+        }
+        .bg-blobs::before,
+        .bg-blobs::after {
+          display: none;
+        }
+      }
+
+      .card {
+        position: relative;
+        padding: 1.25rem;
+        border-radius: 1rem;
+        background: var(--card);
+        border: 1px solid var(--card-border);
+        box-shadow: 0 10px 24px rgba(2, 6, 23, 0.12);
+        backdrop-filter: blur(8px);
+        transition: transform 0.2s ease, box-shadow 0.2s ease,
+          border-color 0.2s ease;
+      }
+      .card::after {
+        content: "";
+        position: absolute;
+        inset: -1px;
+        border-radius: inherit;
+        background: radial-gradient(
+            120px 60px at 20% 0%,
+            rgba(124, 58, 237, 0.25),
+            transparent 60%
+          ),
+          radial-gradient(
+            120px 60px at 80% 100%,
+            rgba(6, 182, 212, 0.25),
+            transparent 60%
+          );
+        z-index: -1;
+        filter: blur(18px);
+        opacity: 0;
+        transition: opacity 0.25s ease;
+      }
+      .card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 14px 36px rgba(2, 6, 23, 0.18);
+        border-color: rgba(124, 58, 237, 0.45);
+      }
+      .card:hover::after {
+        opacity: 1;
+      }
+
+      .grad-text {
+        background: linear-gradient(
+          90deg,
+          var(--brand1),
+          var(--brand2),
+          var(--brand3)
+        );
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+      }
+      h1 {
+        font-size: clamp(1.6rem, 2.5vw + 1rem, 2.2rem);
+      }
+
+      .pill {
+        padding: 0.48rem 0.9rem;
+        border-radius: 9999px;
+        border: 1px solid;
+        font-size: 0.85rem;
+        cursor: pointer;
+        user-select: none;
+        transition: transform 0.12s ease, box-shadow 0.12s ease,
+          background 0.2s ease, color 0.2s ease;
+      }
+      .pill:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 6px 16px rgba(2, 6, 23, 0.15);
+      }
+      .pill-on {
+        background: #7c3aed;
+        color: #fff;
+        border-color: #7c3aed;
+      }
+      .pill-off {
+        background: #0f172a;
+        color: #e2e8f0;
+        border-color: #334155;
+      }
+
+      .btn {
+        position: relative;
+        overflow: hidden;
+      }
+      .btn .ripple {
+        position: absolute;
+        width: 10px;
+        height: 10px;
+        background: rgba(255, 255, 255, 0.55);
+        border-radius: 50%;
+        transform: translate(-50%, -50%) scale(0);
+        animation: ripple 0.6s ease-out;
+        pointer-events: none;
+        mix-blend-mode: overlay;
+      }
+      @keyframes ripple {
+        to {
+          transform: translate(-50%, -50%) scale(16);
+          opacity: 0;
+        }
+      }
+      .magnet {
+        transition: transform 0.12s ease;
+        will-change: transform;
+      }
+
+      /* Images: landscape */
+      .img-thumb {
+        width: 100%;
+        aspect-ratio: 16/9;
+        height: auto !important;
+        object-fit: cover;
+        border-radius: 0.9rem;
+        border: 1px solid var(--card-border);
+      }
+      #aiRow {
+        display: flex;
+        gap: 0.75rem;
+        align-items: flex-start;
+      }
+      #aiHero {
+        width: 100%;
+        max-height: 260px; /* ⬅ hero-г дээд тал нь ~260px */
+        aspect-ratio: auto; /* 16/9 албадахгүй */
+        object-fit: cover;
+        border-radius: 1rem;
+        border: 1px solid var(--card-border);
+      }
+      /* Thumb column: hero өндөртэй тааруулж гүйдэг болгоно */
+      #thumbCol {
+        width: 96px;
+        max-height: 260px;
+        overflow: auto;
+      }
+      .img-fallback {
+        display: grid;
+        place-items: center;
+        background: rgba(148, 163, 184, 0.15);
+        color: var(--muted);
+        font-size: 0.8rem;
+        aspect-ratio: 16/9;
+        height: auto !important;
+      }
+
+      .kpi .value {
+        font-weight: 800;
+        font-size: 1.9rem;
+        line-height: 1;
+        background: linear-gradient(
+          90deg,
+          var(--brand1),
+          var(--brand2),
+          var(--brand3)
+        );
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+      }
+      .kpi .label {
+        font-size: 0.72rem;
+        color: var(--muted);
+      }
+
+      .chip {
+        padding: 0.28rem 0.6rem;
+        border-radius: 0.6rem;
+        background: linear-gradient(
+          90deg,
+          rgba(124, 58, 237, 0.12),
+          rgba(6, 182, 212, 0.12)
+        );
+        border: 1px solid var(--card-border);
+        color: var(--muted);
+        font-size: 0.75rem;
+      }
+
+      #loading {
+        position: fixed;
+        inset: 0;
+        z-index: 80;
+        display: none;
+        background: rgba(5, 8, 20, 0.55);
+        backdrop-filter: blur(3px);
+      }
+      #loading.show {
+        display: grid;
+        place-items: center;
+      }
+      .cube {
+        width: 80px;
+        height: 80px;
+        position: relative;
+        transform-style: preserve-3d;
+        animation: spin 1.3s linear infinite;
+      }
+      .cube div {
+        position: absolute;
+        width: 80px;
+        height: 80px;
+        background: linear-gradient(180deg, #93c5fd, #60a5fa);
+        opacity: 0.92;
+        border-radius: 16px;
+        box-shadow: 0 14px 36px rgba(96, 165, 250, 0.35);
+      }
+      .cube .front {
+        transform: translateZ(40px);
+      }
+      .cube .back {
+        transform: rotateY(180deg) translateZ(40px);
+      }
+      .cube .right {
+        transform: rotateY(90deg) translateZ(40px);
+      }
+      .cube .left {
+        transform: rotateY(-90deg) translateZ(40px);
+      }
+      .cube .top {
+        transform: rotateX(90deg) translateZ(40px);
+      }
+      .cube .bottom {
+        transform: rotateX(-90deg) translateZ(40px);
+      }
+      @keyframes spin {
+        0% {
+          transform: rotateX(0) rotateY(0);
+        }
+        100% {
+          transform: rotateX(360deg) rotateY(360deg);
+        }
+      }
+
+      .reveal {
+        opacity: 0;
+        transform: translateY(18px) scale(0.98);
+        transition: opacity 0.55s cubic-bezier(0.2, 0.65, 0.25, 1),
+          transform 0.55s cubic-bezier(0.2, 1.4, 0.2, 1);
+      }
+      .reveal.show {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+
+      #newsWrap.clamp {
+        max-height: 320px;
+        overflow: hidden;
+        position: relative;
+      }
+      #newsWrap.clamp::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 64px;
+        background: linear-gradient(
+          to top,
+          var(--card),
+          rgba(255, 255, 255, 0)
+        );
+      }
+      html.dark #newsWrap.clamp::after {
+        background: linear-gradient(to top, var(--card), rgba(15, 23, 42, 0));
+      }
+
+      table.zebra tbody tr:nth-child(even) {
+        background: rgba(148, 163, 184, 0.06);
+      }
+      table.zebra td,
+      table.zebra th {
+        white-space: nowrap;
+      }
+      tbody tr {
+        animation: rowIn 0.45s cubic-bezier(0.2, 0.75, 0.3, 1) both;
+      }
+      @keyframes rowIn {
+        from {
+          opacity: 0;
+          transform: translateY(6px);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+
+      .chart-card {
+        display: grid;
+        grid-template-rows: auto 1fr;
+      }
+      .chart-box {
+        height: 320px;
+      }
+      .chart-box > canvas {
+        width: 100% !important;
+        height: 100% !important;
+        display: block;
+      }
+
+      .confetti {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        z-index: 70;
+      }
+      .confetti .p {
+        position: absolute;
+        width: 8px;
+        height: 12px;
+        border-radius: 2px;
+        opacity: 0.9;
+        animation: confetti 900ms ease-out forwards;
+      }
+      @keyframes confetti {
+        0% {
+          transform: translate(var(--x, 0), var(--y, 0)) rotate(0deg);
+        }
+        100% {
+          transform: translate(
+              calc(var(--x, 0) + var(--dx, 0px)),
+              calc(var(--y, 0) + var(--dy, 40px))
+            )
+            rotate(300deg);
+          opacity: 0;
+        }
+      }
+
+      body.loading .skeleton {
+        position: relative;
+        overflow: hidden;
+        background: rgba(148, 163, 184, 0.15);
+        border-radius: 0.75rem;
+        min-height: 26px;
+      }
+      body.loading .skeleton::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(
+          90deg,
+          transparent,
+          rgba(255, 255, 255, 0.35),
+          transparent
+        );
+        transform: translateX(-100%);
+        animation: shimmer 1.2s infinite;
+      }
+      @keyframes shimmer {
+        to {
+          transform: translateX(100%);
+        }
+      }
+
+      .sticky-top {
+        position: sticky;
+        top: 0;
+        z-index: 60;
+        backdrop-filter: blur(10px);
+        background: linear-gradient(
+          180deg,
+          rgba(5, 8, 20, 0.65),
+          rgba(5, 8, 20, 0.3)
+        );
+        border-bottom: 1px solid var(--card-border);
+      }
+
+      /* Small thumbs row under hero */
+      #publicImages {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+      }
+      #publicImages a {
+        display: block;
+      }
+      #publicImages img {
+        width: 100%;
+        height: 72px; /* ⬅ өмнө 1:1 том байсан */
+        aspect-ratio: auto;
+        object-fit: cover;
+        border-radius: 0.5rem;
+        border: 1px solid var(--card-border);
+      }
     </style>
   </head>
-  <body class="h-full bg-gradient-to-b from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-950 text-slate-900 dark:text-slate-100">
-    <div class="max-w-7xl mx-auto p-4 md:p-6 space-y-6">
 
-      <!-- Header -->
-      <header class="flex items-center justify-between">
-        <div class="space-y-1">
-          <h1 class="text-2xl md:text-3xl font-bold tracking-tight">Social Search Dashboard</h1>
-          <p class="text-sm text-slate-500 dark:text-slate-400">Realtime social + news · AI insights · Dark mode</p>
+  <body class="h-full text-slate-900 dark:text-slate-100 bg-blobs">
+    <!-- Loading overlay (3D cube) -->
+    <div id="loading">
+      <div class="cube">
+        <div class="front"></div>
+        <div class="back"></div>
+        <div class="right"></div>
+        <div class="left"></div>
+        <div class="top"></div>
+        <div class="bottom"></div>
+      </div>
+    </div>
+    <div id="confetti" class="confetti"></div>
+
+    <!-- Sticky header: search controls -->
+    <div class="sticky-top">
+      <div
+        class="max-w-7xl mx-auto px-4 md:px-6 py-3 flex items-center justify-between gap-3"
+      >
+        <div class="flex items-center gap-3">
+          <span class="grad-text font-extrabold text-lg">Social Search</span>
+          <span
+            id="status"
+            class="text-xs"
+            style="color: var(--fg-soft)"
+          ></span>
         </div>
         <div class="flex items-center gap-2">
-          <input id="q" class="px-3 py-2 rounded-xl border bg-white/90 border-slate-300 dark:bg-slate-800 dark:border-slate-700" placeholder="xacbank, ...">
-          <button id="searchBtn" class="px-3 py-2 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 text-sm">Хайх</button>
-          <button id="themeToggle" class="pill pill-off" title="Dark/Light">Dark</button>
-          <span id="status" class="text-xs text-slate-500 dark:text-slate-400"></span>
+          <input
+            id="q"
+            class="px-3 py-2 rounded-xl border bg-white/90 border-slate-300 dark:bg-slate-800 dark:border-slate-700 min-w-[240px]"
+            placeholder="xacbank, mcs group, ..."
+          />
+          <button
+            id="searchBtn"
+            class="btn magnet px-3 py-2 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 text-sm"
+          >
+            Хайх
+          </button>
+          <button
+            id="themeToggle"
+            class="btn magnet pill pill-off"
+            title="Dark/Light"
+          >
+            Dark
+          </button>
         </div>
-      </header>
+      </div>
+    </div>
 
-      <!-- ONE PAGE -->
-      <section class="space-y-6">
-        <!-- Filters -->
-        <section class="card">
-          <div class="flex items-center gap-3 flex-wrap" id="platformFilters"></div>
-          <div class="flex items-center gap-3 flex-wrap mt-3">
-            <label class="text-sm text-slate-500 dark:text-slate-400">Хугацаа</label>
-            <select id="range" class="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-sm">
-              <option value="all">Бүгд</option>
-              <option value="d7">Сүүлийн 7 хоног</option>
-              <option value="d30">Сүүлийн 30 өдөр</option>
-              <option value="d90">Сүүлийн 90 өдөр</option>
-              <option value="y2024">Зөвхөн 2024 он</option>
-            </select>
-
-            <div class="w-px h-6 bg-slate-200 dark:bg-slate-700"></div>
-
-            <label class="text-sm text-slate-500 dark:text-slate-400">Sort</label>
-            <select id="sortBy" class="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-1">
-              <option value="date_desc">Огноо ↓</option>
-              <option value="engagement_desc">Engagement ↓</option>
-              <option value="likes_desc">Лайк ↓</option>
-              <option value="comments_desc">Сэтгэгдэл ↓</option>
-              <option value="views_desc">Үзэлт ↓</option>
-            </select>
+    <!-- Hero -->
+    <div class="max-w-7xl mx-auto px-4 md:px-6 pt-6">
+      <div class="rounded-2xl p-5 md:p-6 card">
+        <div class="flex items-center justify-between">
+          <div>
+            <div class="text-sm" style="color: var(--fg-soft)">
+              Realtime Social & News
+            </div>
+            <h1
+              class="text-3xl md:text-[2.2rem] font-extrabold tracking-tight grad-text"
+            >
+              Social Search Dashboard
+            </h1>
           </div>
-        </section>
+          <span class="chip">v2 · MN-tuned</span>
+        </div>
+      </div>
+    </div>
 
-        <!-- KPIs -->
-        <section class="grid grid-cols-2 md:grid-cols-5 gap-4">
-          <div class="card"><div class="text-2xl font-semibold" id="kpiPosts">0</div><div class="text-xs text-slate-500 dark:text-slate-400">Нийт бичлэг</div></div>
-          <div class="card"><div class="text-2xl font-semibold" id="kpiLikes">0</div><div class="text-xs text-slate-500 dark:text-slate-400">Нийт лайк</div></div>
-          <div class="card"><div class="text-2xl font-semibold" id="kpiComments">0</div><div class="text-xs text-slate-500 dark:text-slate-400">Нийт сэтгэгдэл</div></div>
-          <div class="card"><div class="text-2xl font-semibold" id="kpiShares">0</div><div class="text-xs text-slate-500 dark:text-slate-400">Нийт шэйр</div></div>
-          <div class="card"><div class="text-2xl font-semibold" id="kpiViews">0</div><div class="text-xs text-slate-500 dark:text-slate-400">Нийт үзэлт</div></div>
-        </section>
+    <div class="max-w-7xl mx-auto p-4 md:p-6 space-y-6">
+      <!-- AI Insight (full width, hero + small images under) -->
+      <section class="card reveal">
+        <div class="flex items-center justify-between mb-1">
+          <div class="text-sm" style="color: var(--fg-soft)">
+            News / Insights (AI)
+          </div>
+          <div id="aiBadge" class="text-xs" style="color: var(--fg-soft)"></div>
+        </div>
 
-        <!-- Charts -->
-        <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div class="card">
-            <div class="text-sm text-slate-500 dark:text-slate-400 mb-2">Engagement by Platform</div>
-            <canvas id="engagementChart" height="120"></canvas>
-          </div>
-          <div class="card">
-            <div class="text-sm text-slate-500 dark:text-slate-400 mb-2">Breakdown (Stacked)</div>
-            <canvas id="stackedChart" height="120"></canvas>
-          </div>
-        </section>
+        <div id="newsWrap" class="mt-1">
+          <div
+            id="newsBox"
+            class="prose max-w-none text-sm whitespace-pre-wrap leading-6"
+          ></div>
+        </div>
+        <div class="mt-2">
+          <button
+            id="newsToggle"
+            class="hidden btn text-xs px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white/70 dark:bg-slate-800/60 hover:bg-slate-100 dark:hover:bg-slate-700"
+          >
+            Дэлгэрэнгүй
+          </button>
+        </div>
 
-        <!-- Table -->
-        <section class="card">
-          <div class="flex items-center justify-between mb-2">
-            <div class="text-sm text-slate-500 dark:text-slate-400">Илэрцүүд</div>
+        <div id="aiRow" class="mt-3 flex gap-3 items-start">
+          <img id="aiHero" class="hidden flex-1" alt="insight image" />
+          <div id="thumbCol">
+            <div id="publicImages"></div>
           </div>
-          <div class="overflow-x-auto">
-            <table id="topTable" class="min-w-full text-sm">
-              <thead>
-                <tr class="text-left border-b border-slate-200 dark:border-slate-700">
-                  <th class="px-3 py-2">Платформ</th>
-                  <th class="px-3 py-2">Текст</th>
-                  <th class="px-3 py-2 text-right">Огноо</th>
-                  <th class="px-3 py-2 text-right">Лайк</th>
-                  <th class="px-3 py-2 text-right">Сэтгэгдэл</th>
-                  <th class="px-3 py-2 text-right">Шэйр</th>
-                  <th class="px-3 py-2 text-right">Үзэлт</th>
-                  <th class="px-3 py-2 text-right">Engagement</th>
-                  <th class="px-3 py-2 text-right">Линк</th>
-                </tr>
-              </thead>
-              <tbody></tbody>
-            </table>
-          </div>
-        </section>
+        </div>
 
-        <!-- News / Insights (AI) -->
-        <!-- <section class="card">
-          <div class="text-sm text-slate-500 dark:text-slate-400 mb-2">News / Insights (AI)</div>
-          <div id="newsBox" class="prose max-w-none text-sm whitespace-pre-wrap leading-6"></div>
-          <div class="mt-3">
-            <div class="text-xs text-slate-500 dark:text-slate-400 mb-1">Sources:</div>
-            <ul id="newsSources" class="list-disc list-inside text-sm text-blue-700 dark:text-blue-400"></ul>
-          </div>
-        </section> -->
-
-        <!-- Chat (optional, keep on same page) -->
-        <!-- <section class="card">
-          <div id="chatLog" class="flex flex-col"></div>
-          <div id="chatImages" class="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-3"></div>
-          <div class="mt-3 flex gap-2">
-            <input id="chatInput" class="flex-1 px-3 py-2 rounded-xl border bg-white/90 border-slate-300 dark:bg-slate-900 dark:border-slate-700" placeholder="Perplexity-гээс асуу (ж: xacbank latest updates)…">
-            <button id="chatSend" class="px-3 py-2 rounded-xl border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-900/40 dark:border-emerald-700 text-sm">Send</button>
-          </div>
-        </section> -->
-
+        <div class="mt-4">
+          <div class="text-xs" style="color: var(--fg-soft)">Sources:</div>
+          <ul
+            id="newsSources"
+            class="list-disc list-inside text-sm text-blue-700 dark:text-blue-400"
+          ></ul>
+        </div>
       </section>
 
-      <footer class="text-xs text-slate-500 dark:text-slate-400"><p>© 2025 Social Search Dashboard</p></footer>
+      <!-- Filters -->
+      <section class="card reveal">
+        <div
+          class="flex items-center gap-3 flex-wrap"
+          id="platformFilters"
+        ></div>
+        <div class="flex items-center gap-3 flex-wrap mt-3">
+          <label class="text-sm" style="color: var(--fg-soft)">Хугацаа</label>
+          <select
+            id="range"
+            class="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-sm"
+          >
+            <option value="all">Бүгд</option>
+            <option value="d7">Сүүлийн 7 хоног</option>
+            <option value="d30">Сүүлийн 30 өдөр</option>
+            <option value="d90">Сүүлийн 90 өдөр</option>
+            <option value="y2024">Зөвхөн 2024 он</option>
+          </select>
+
+          <div class="w-px h-6" style="background: var(--card-border)"></div>
+
+          <label class="text-sm" style="color: var(--fg-soft)">Sort</label>
+          <select
+            id="sortBy"
+            class="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-1"
+          >
+            <option value="date_desc">Огноо ↓</option>
+            <option value="engagement_desc">Engagement ↓</option>
+            <option value="likes_desc">Лайк ↓</option>
+            <option value="comments_desc">Сэтгэгдэл ↓</option>
+            <option value="views_desc">Үзэлт ↓</option>
+          </select>
+        </div>
+      </section>
+
+      <!-- KPIs -->
+      <section class="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div class="card kpi reveal">
+          <div class="value" id="kpiPosts">0</div>
+          <div class="label">Нийт бичлэг</div>
+        </div>
+        <div class="card kpi reveal">
+          <div class="value" id="kpiLikes">0</div>
+          <div class="label">Нийт лайк</div>
+        </div>
+        <div class="card kpi reveal">
+          <div class="value" id="kpiComments">0</div>
+          <div class="label">Нийт сэтгэгдэл</div>
+        </div>
+        <div class="card kpi reveal">
+          <div class="value" id="kpiShares">0</div>
+          <div class="label">Нийт шэйр</div>
+        </div>
+        <div class="card kpi reveal">
+          <div class="value" id="kpiViews">0</div>
+          <div class="label">Нийт үзэлт</div>
+        </div>
+      </section>
+
+      <!-- Charts -->
+      <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="card reveal chart-card">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-sm" style="color: var(--fg-soft)"
+              >Engagement by Platform</span
+            >
+            <span class="chip">bar chart</span>
+          </div>
+          <div class="chart-box"><canvas id="engagementChart"></canvas></div>
+        </div>
+
+        <div class="card reveal chart-card">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-sm" style="color: var(--fg-soft)"
+              >Breakdown (Stacked)</span
+            >
+            <span class="chip">stacked</span>
+          </div>
+          <div class="chart-box"><canvas id="stackedChart"></canvas></div>
+        </div>
+      </section>
+
+      <!-- Table -->
+      <section class="card reveal">
+        <div class="flex items-center justify-between mb-2">
+          <div class="text-sm" style="color: var(--fg-soft)">Илэрцүүд</div>
+        </div>
+        <div class="overflow-x-auto">
+          <table id="topTable" class="min-w-full text-sm zebra">
+            <thead>
+              <tr
+                class="text-left"
+                style="border-bottom: 1px solid var(--card-border)"
+              >
+                <th class="px-3 py-2">Платформ</th>
+                <th class="px-3 py-2">Текст</th>
+                <th class="px-3 py-2 text-right">Огноо</th>
+                <th class="px-3 py-2 text-right">Лайк</th>
+                <th class="px-3 py-2 text-right">Сэтгэгдэл</th>
+                <th class="px-3 py-2 text-right">Шэйр</th>
+                <th class="px-3 py-2 text-right">Үзэлт</th>
+                <th class="px-3 py-2 text-right">Engagement</th>
+                <th class="px-3 py-2 text-right">Линк</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <footer class="text-xs" style="color: var(--fg-soft)">
+        <p>© 2025 Social Search Dashboard</p>
+      </footer>
     </div>
+
+    <!-- Таны app JS -->
     <script src="app.search.js"></script>
   </body>
 </html>
