@@ -1,5 +1,5 @@
 // ===== Config =====
-const API_BASE = ""; // same-origin
+const API_BASE = "https://social-dashboard-h1su.onrender.com"; // same-origin
 const ALL_PLATFORMS = [
   "YouTube",
   "Reddit",
